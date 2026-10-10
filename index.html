@@ -1,0 +1,1529 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Frame Detective: One glance. One mystery.</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Nunito:wght@500;700;800&display=swap">
+<style>
+:root{
+  --bg:#fbf6ea; --paper:#ffffff; --ink:#14213d; --ink2:#46526d;
+  --teal:#0b7a7a; --on-teal:#ffffff; --gold:#f5b82e; --gold-l:#fcebb5; --on-gold:#14213d;
+  --ok:#2a8a57; --ok-bg:#dff3e7; --bad:#b8433a; --bad-bg:#f8e2de;
+  --line:#14213d; --shadow:#14213d; --focus:#1d5fd1; --scrim:rgba(20,33,61,.55);
+  --frame-bg:#14213d; --cell:#ffffff; --dot:#14213d; --hi:#fcebb5;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1a30; --paper:#17284a; --ink:#f4efe2; --ink2:#b4bdd0;
+    --teal:#2bb6b0; --on-teal:#0e1a30; --gold:#f5c04a; --gold-l:#3b3a22;
+    --ok:#58c98a; --ok-bg:#12382a; --bad:#ef8a80; --bad-bg:#40201f;
+    --line:#8da0c8; --shadow:#050b18; --focus:#8dbbff; --scrim:rgba(3,8,20,.7);
+    --frame-bg:#8da0c8; --hi:#4a4424;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1a30; --paper:#17284a; --ink:#f4efe2; --ink2:#b4bdd0;
+  --teal:#2bb6b0; --on-teal:#0e1a30; --gold:#f5c04a; --gold-l:#3b3a22;
+  --ok:#58c98a; --ok-bg:#12382a; --bad:#ef8a80; --bad-bg:#40201f;
+  --line:#8da0c8; --shadow:#050b18; --focus:#8dbbff; --scrim:rgba(3,8,20,.7);
+  --frame-bg:#8da0c8; --hi:#4a4424;
+}
+*{box-sizing:border-box}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:'Nunito',system-ui,'Segoe UI',Arial,sans-serif;font-size:18px;line-height:1.4;-webkit-tap-highlight-color:transparent}
+#app{height:100%;display:flex;flex-direction:column}
+h1,h2,h3{font-family:'Alfa Slab One','Rockwell','Georgia',serif;font-weight:400;line-height:1.12;margin:0}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:4px solid var(--focus);outline-offset:3px}
+.muted{color:var(--ink2)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.screen{flex:1;min-height:0;display:flex;flex-direction:column}
+.scroll{flex:1;min-height:0;overflow:auto}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5em;min-height:54px;padding:.5em 1.3em;border:3px solid var(--line);border-radius:14px;background:var(--teal);color:var(--on-teal);font-weight:800;font-size:1.05rem;box-shadow:0 5px 0 var(--shadow);transition:transform .08s,box-shadow .08s;text-align:center}
+.btn:active:not(:disabled){transform:translateY(4px);box-shadow:0 1px 0 var(--shadow)}
+.btn.gold{background:var(--gold);color:var(--on-gold)}
+.btn.ghost{background:var(--paper);color:var(--ink)}
+.btn.big{min-height:70px;font-size:1.35rem;padding:.55em 1.8em;border-radius:18px}
+.btn.sm{min-height:44px;padding:.25em .9em;font-size:.95rem;border-radius:12px;box-shadow:0 3px 0 var(--shadow)}
+.btn:disabled{opacity:.5;cursor:not-allowed;box-shadow:0 2px 0 var(--shadow)}
+.card{background:var(--paper);border:3px solid var(--line);border-radius:18px;box-shadow:0 6px 0 var(--shadow);padding:20px}
+
+/* the five-frame: five equal white cells, dark outline, one centred dot per occupied cell */
+.frame{--bw:clamp(4px,.7vw,9px);display:grid;grid-template-columns:repeat(5,1fr);gap:var(--bw);padding:var(--bw);background:var(--frame-bg);border-radius:calc(var(--bw)*2);width:100%}
+.frame .cell{position:relative;aspect-ratio:1/1;background:var(--cell);border-radius:calc(var(--bw)*.7);display:grid;place-items:center}
+.frame .dot{position:absolute;inset:19%;border-radius:50%;background:var(--dot)}
+.frame .cell.hi{background:var(--hi);color:#14213d}
+.frame .cell.hi::after{content:"+";font-weight:800;font-size:clamp(1rem,3vw,2.4rem);color:var(--ink)}
+.frame.sm{--bw:3px}
+.frame.xs{--bw:2px}
+.frame-wrap{width:min(94%,980px)}
+.frame-wrap.md{width:min(94%,560px)}
+
+/* top and bottom bars */
+.top{display:flex;align-items:center;gap:12px;padding:10px clamp(12px,2.4vw,28px);flex-wrap:wrap}
+.top .sp{flex:1}
+.stamp{font-family:'Alfa Slab One','Rockwell',serif;background:var(--gold);color:#14213d;border:3px solid var(--line);border-radius:8px;padding:2px 12px;transform:rotate(-1.5deg);font-size:1.05rem;white-space:nowrap}
+.rnd{font-weight:800}
+.track{display:block;width:clamp(90px,16vw,220px);height:14px;border:3px solid var(--line);border-radius:9px;background:var(--paper);overflow:hidden}
+.track i{display:block;height:100%;background:var(--teal);transition:width .3s}
+.teamchip{display:inline-flex;align-items:center;gap:6px;border:3px solid var(--line);border-radius:999px;padding:2px 12px;font-weight:800;background:var(--paper)}
+.teamchip b{font-size:1.1em}
+.prog{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px clamp(12px,2.4vw,28px) 14px;border-top:3px solid var(--line);background:var(--paper)}
+.prog .lab{font-weight:800}
+.slots{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.slot{width:34px;height:34px;display:grid;place-items:center;border:2px dashed var(--line);border-radius:8px;font-size:1.1rem;color:var(--ink2);background:var(--bg)}
+.slot.found{border-style:solid;background:var(--gold-l);color:var(--ink)}
+.slot.lg{width:56px;height:56px;font-size:1.8rem}
+.prog .sp{flex:1}
+.pill{display:inline-flex;gap:6px;align-items:baseline;border:3px solid var(--line);border-radius:999px;padding:2px 14px;font-weight:800;background:var(--bg)}
+
+/* stage */
+.stage{flex:1;min-height:0;display:flex;overflow:auto;padding:clamp(10px,2vh,24px) clamp(14px,3vw,40px)}
+.inner{width:100%;max-width:1040px;margin:auto;display:flex;flex-direction:column;align-items:center;gap:clamp(12px,2.2vh,24px);text-align:center}
+.phase{font-family:'Alfa Slab One','Rockwell',serif;font-size:clamp(1.6rem,3.6vw,2.8rem)}
+.q{font-size:clamp(1.5rem,3.4vw,2.6rem)}
+.h-xl{font-size:clamp(2rem,4.6vw,3.6rem)}
+.hidden-card{width:min(94%,980px);min-height:clamp(120px,22vh,220px);border:4px dashed var(--line);border-radius:22px;display:grid;place-items:center;align-content:center;gap:6px;padding:20px;background:var(--paper)}
+.hidden-card .big{font-size:clamp(2rem,5vw,3.4rem)}
+.count{font-family:'Alfa Slab One','Rockwell',serif;font-size:clamp(5rem,16vw,10rem);line-height:1;color:var(--teal)}
+.lens{font-size:clamp(3rem,8vw,5rem)}
+.note{display:inline-block;border:3px solid var(--line);background:var(--gold-l);border-radius:12px;padding:4px 14px;font-weight:800}
+
+/* answers */
+.opts{display:grid;gap:clamp(10px,1.6vw,20px);width:100%;max-width:calc(var(--n)*230px);grid-template-columns:repeat(var(--n),minmax(0,1fr))}
+.opts.words{max-width:1040px}
+.opts.frames{max-width:1040px;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.opt{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:clamp(100px,17vh,180px);padding:14px 10px;background:var(--paper);color:var(--ink);border:4px solid var(--line);border-radius:18px;box-shadow:0 6px 0 var(--shadow);font-weight:800;transition:transform .08s}
+.opt:hover:not(:disabled){transform:translateY(-2px)}
+.opt:active:not(:disabled){transform:translateY(4px);box-shadow:0 2px 0 var(--shadow)}
+.opt:disabled{cursor:default}
+.opt .num{font-family:'Alfa Slab One','Rockwell',serif;font-size:clamp(3rem,8vw,6rem);line-height:1}
+.opt .word{font-size:clamp(1.2rem,2.2vw,1.8rem)}
+.opt .sym{font-size:clamp(1.4rem,2.6vw,2.2rem);letter-spacing:.1em}
+.opt .key{position:absolute;top:8px;left:10px;width:28px;height:28px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:.9rem;background:var(--bg)}
+.opt .tag{font-size:.9rem;font-weight:800}
+.opt .frame{--bw:3px}
+.opt.sel{background:var(--gold-l);box-shadow:0 0 0 6px var(--gold),0 6px 0 var(--shadow)}
+.opt.wrong{background:var(--bad-bg);border-color:var(--bad);color:var(--ink)}
+.opt.removed{opacity:.5;border-style:dashed}
+.opt.right{background:var(--ok-bg);border-color:var(--ok)}
+.resp-actions{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+.tip{font-size:1rem}
+.hintnote{border:3px solid var(--line);border-radius:12px;padding:8px 14px;background:var(--gold-l);font-weight:700;max-width:760px}
+
+/* feedback */
+.banner{display:flex;gap:16px;align-items:center;padding:14px 22px;border-radius:18px;border:4px solid;text-align:left;width:100%;max-width:880px}
+.banner.ok{background:var(--ok-bg);border-color:var(--ok)}
+.banner.bad{background:var(--bad-bg);border-color:var(--bad)}
+.banner .ico{flex:none;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font-size:1.8rem;font-weight:800;color:#fff}
+.banner.ok .ico{background:var(--ok)}
+.banner.bad .ico{background:var(--bad)}
+.banner h2{font-size:clamp(1.4rem,2.8vw,2.1rem)}
+.banner .pts{margin-left:auto;font-family:'Alfa Slab One','Rockwell',serif;font-size:1.8rem;white-space:nowrap}
+.explain{max-width:760px;font-size:1.15rem;font-weight:700}
+.cluecard{display:flex;align-items:center;gap:12px;border:3px solid var(--line);background:var(--gold-l);border-radius:14px;padding:8px 16px;font-weight:800;animation:pop .45s ease-out}
+.cluecard .em{font-size:2rem}
+@keyframes pop{from{transform:scale(.6) rotate(-6deg);opacity:0}to{transform:none;opacity:1}}
+.reveal{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%}
+.reveal .cap{font-weight:800}
+.frames-row{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;width:100%}
+.frames-row>div{flex:1 1 300px;max-width:520px}
+
+/* drawer, modal */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(400px,94vw);background:var(--paper);border-left:4px solid var(--line);z-index:30;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.drawer header{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:3px solid var(--line)}
+.drawer header h3{font-size:1.3rem;flex:1}
+.drawer .body{padding:16px 18px;overflow:auto;display:flex;flex-direction:column;gap:16px}
+.drawer dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:.98rem}
+.drawer dt{color:var(--ink2);font-weight:700}
+.drawer dd{margin:0;font-weight:800}
+.tgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tgrid .btn{min-height:46px;font-size:.95rem;padding:.2em .6em}
+.mini-table{width:100%;border-collapse:collapse;font-size:.95rem}
+.mini-table td,.mini-table th{padding:4px 6px;border-bottom:2px solid var(--bg);text-align:left}
+.overlay{position:fixed;inset:0;z-index:40;background:var(--scrim);display:grid;place-items:center;padding:20px}
+.modal{max-width:560px;width:100%;text-align:center;display:flex;flex-direction:column;gap:16px}
+.modal h2{font-size:1.7rem}
+.modal .row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;max-width:92vw}
+#toast div{background:var(--ink);color:var(--bg);border-radius:14px;padding:12px 20px;font-weight:800;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+
+/* welcome */
+.welcome{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:clamp(18px,4vw,60px);align-items:center;padding:clamp(18px,4vw,56px)}
+.welcome h1{font-size:clamp(2.6rem,7vw,5.6rem)}
+.tagline{font-size:clamp(1.15rem,2.2vw,1.6rem);font-weight:700;margin:12px 0 22px}
+.todays{display:inline-block;max-width:100%;border:3px solid var(--line);border-radius:14px;background:var(--gold-l);padding:10px 18px;margin-bottom:24px;font-weight:700}
+.todays b{font-weight:800}
+.w-actions{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.casefile{background:#fffaf0;color:#14213d;border:4px solid #14213d;border-radius:22px;box-shadow:0 10px 0 #14213d;padding:clamp(16px,3vw,32px);position:relative;display:flex;flex-direction:column;gap:18px;--frame-bg:#14213d;--cell:#fff;--dot:#14213d}
+.casefile::before{content:"";position:absolute;top:-18px;left:28px;width:150px;height:30px;background:#f5b82e;border:4px solid #14213d;border-radius:12px 12px 0 0}
+.casefile .who{display:flex;align-items:flex-end;gap:12px}
+.casefile svg{width:min(34%,170px);height:auto;flex:none}
+.casefile .says{font-weight:800;font-size:1.1rem;padding-bottom:14px}
+.mag{position:relative}
+.mag .lens-ring{position:absolute;width:21%;aspect-ratio:1;border:7px solid #f5b82e;border-radius:50%;background:rgba(255,255,255,.35);left:39%;top:-6%;box-shadow:0 0 0 3px #14213d;animation:sweep 5s ease-in-out infinite}
+@keyframes sweep{0%,100%{transform:translateX(-170%)}50%{transform:translateX(170%)}}
+
+/* generic page chrome */
+.page{max-width:1100px;width:100%;margin:0 auto;padding:clamp(14px,3vw,36px);display:flex;flex-direction:column;gap:22px}
+.pagehead{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.pagehead h1{font-size:clamp(1.8rem,4vw,2.8rem);flex:1}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:22px;align-items:start}
+.card h3{font-size:1.35rem;margin-bottom:12px}
+.card .sub{color:var(--ink2);font-size:.95rem;margin:-6px 0 12px}
+.field{margin-bottom:16px}
+.field>label,.field>.lbl{display:block;font-weight:800;margin-bottom:6px}
+.seg{display:flex;flex-wrap:wrap;gap:8px}
+.segbtn{min-height:46px;padding:.2em 1em;border:3px solid var(--line);border-radius:12px;background:var(--paper);font-weight:800;box-shadow:0 3px 0 var(--shadow)}
+.segbtn[aria-pressed="true"]{background:var(--teal);color:var(--on-teal)}
+.diffs{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.diffs .segbtn{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:8px 12px;gap:2px}
+.diffs small{font-weight:700;opacity:.85}
+.tgl{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;background:none;border:0;padding:8px 0}
+.tgl .sw{flex:none;width:52px;height:30px;border:3px solid var(--line);border-radius:999px;background:var(--bg);position:relative;margin-top:2px}
+.tgl .sw::after{content:"";position:absolute;top:2px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--line);transition:left .12s}
+.tgl[aria-checked="true"] .sw{background:var(--teal)}
+.tgl[aria-checked="true"] .sw::after{left:25px;background:var(--on-teal)}
+.tgl small{display:block;color:var(--ink2);font-weight:600}
+.stepper{display:flex;align-items:center;gap:10px;margin:6px 0}
+.stepper span{flex:1;font-weight:700}
+.stepper b{min-width:1.6em;text-align:center;font-size:1.15rem}
+.stepper button{width:44px;height:44px;border:3px solid var(--line);border-radius:12px;background:var(--paper);font-weight:800;font-size:1.3rem;line-height:1}
+.stepper button:disabled{opacity:.4}
+input[type=text]{font:inherit;font-weight:700;padding:8px 12px;border:3px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);width:100%}
+.stickybar{position:sticky;bottom:0;display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px clamp(14px,3vw,36px);background:var(--paper);border-top:4px solid var(--line)}
+.warn{color:var(--bad);font-weight:800}
+.check{font-size:.95rem}
+.check li{margin:2px 0}
+.check .f{color:var(--bad);font-weight:800}
+
+/* how to play, briefing */
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:20px}
+.steps .card{display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.steps .n{font-family:'Alfa Slab One','Rockwell',serif;width:40px;height:40px;border-radius:50%;background:var(--gold);color:#14213d;border:3px solid var(--line);display:grid;place-items:center}
+.steps .hid{width:100%;border:3px dashed var(--line);border-radius:12px;padding:16px;text-align:center;font-size:1.6rem}
+.ex-opts{display:flex;gap:8px;width:100%}
+.ex-opts span{flex:1;text-align:center;border:3px solid var(--line);border-radius:10px;font-family:'Alfa Slab One','Rockwell',serif;padding:4px 0;background:var(--bg)}
+.mysteries{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}
+.mysteries h3{font-size:1.15rem;margin-bottom:6px}
+.speech{border:4px solid var(--line);border-radius:22px;background:var(--paper);padding:18px 24px;font-size:1.25rem;font-weight:700;position:relative}
+.fade{opacity:0;animation:fadein .6s ease forwards}
+@keyframes fadein{to{opacity:1}}
+.labels{display:grid;grid-template-columns:1fr 1fr;gap:10px;font-weight:800;margin-top:8px}
+.rules{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:6px;font-weight:700}
+
+/* report */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px}
+.kpi{text-align:center;padding:14px 10px}
+.kpi b{display:block;font-family:'Alfa Slab One','Rockwell',serif;font-weight:400;font-size:2.4rem;line-height:1.1}
+.kpi span{font-weight:700;color:var(--ink2);font-size:.95rem}
+.bar{height:18px;border:3px solid var(--line);border-radius:10px;background:var(--bg);overflow:hidden;min-width:90px}
+.bar i{display:block;height:100%;background:var(--teal)}
+table.rep{width:100%;border-collapse:collapse}
+table.rep th,table.rep td{padding:8px 10px;text-align:left;border-bottom:2px solid var(--bg);vertical-align:middle}
+table.rep th{font-weight:800}
+.badge{display:flex;align-items:center;gap:16px}
+.badge .medal{width:84px;height:84px;border-radius:50%;background:var(--gold);border:4px solid var(--line);box-shadow:0 5px 0 var(--shadow);display:grid;place-items:center;font-size:2.6rem;color:#14213d;flex:none}
+.ach{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px}
+.ach div{display:flex;gap:10px;align-items:center;border:3px solid var(--line);border-radius:14px;padding:8px 12px;font-weight:800;background:var(--bg)}
+.ach div.on{background:var(--gold-l)}
+.ach div.off{opacity:.6;border-style:dashed}
+.ach small{display:block;font-weight:700;color:var(--ink2)}
+.banner-t{background:var(--gold-l);border:3px solid var(--line);border-radius:14px;padding:10px 16px;font-weight:800}
+.rv{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.rv .frame{width:150px}
+
+@media (max-width:860px){
+  .welcome{grid-template-columns:1fr}
+  .top .track{display:none}
+}
+@media (max-height:620px) and (orientation:landscape){
+  .btn.big{min-height:56px;font-size:1.15rem}
+  .opt{min-height:84px}
+}
+body.rm *,body.rm *::before,body.rm *::after{animation:none!important;transition:none!important}
+body.rm .fade{opacity:1}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.fade{opacity:1}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="live" class="sr" aria-live="polite"></div>
+<div id="toast" role="status"></div>
+<script>
+// ==ENGINE START==
+/* ---------- constants ---------- */
+const TYPES = ['quantity', 'change', 'missing', 'memory'];
+const TYPE_NAME = { quantity: 'Quantity Mystery', change: 'What Changed?', missing: 'Missing Part', memory: 'Memory Match' };
+const CHANGE_LABEL = { '1': 'One more', '2': 'Two more', '-1': 'One less', '-2': 'Two less', '0': 'No change' };
+const CHANGE_ORDER = [1, 2, -1, -2, 0];
+const DURATIONS = [3000, 2000, 1000, 750, 500];
+const PRESETS = {
+  rookie: { name: 'Rookie Detective', duration: 3000, arrangement: 'structured', choices: 3, mystery: 'quantity' },
+  junior: { name: 'Junior Detective', duration: 2000, arrangement: 'structured', choices: 5, mystery: 'mixed' },
+  senior: { name: 'Senior Detective', duration: 1000, arrangement: 'varied', choices: 5, mystery: 'mixed' },
+  master: { name: 'Master Detective', duration: 750, arrangement: 'varied', choices: 5, mystery: 'mixed' }
+};
+
+function defaultSettings() {
+  return {
+    mystery: 'mixed', difficulty: 'junior', duration: 2000, rounds: 10, response: 'class', choices: 5,
+    feedback: 'immediate', audio: false, hints: true, retry: true, arrangement: 'structured', next: 'teacher',
+    adaptive: false, memorySubtype: 'both', missingVariant: 'both', revealChange: true, focus: [],
+    mix: { quantity: 2, change: 2, missing: 2, memory: 2, review: 2 },
+    teamCount: 2,
+    teams: [{ name: 'Owls' }, { name: 'Foxes' }, { name: 'Otters' }, { name: 'Herons' }],
+    reducedMotion: false, showBriefing: true
+  };
+}
+
+/* ---------- small helpers ---------- */
+function rnd(n) { return Math.floor(Math.random() * n); }
+function shuffle(a) {
+  a = a.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); const t = a[i]; a[i] = a[j]; a[j] = t; }
+  return a;
+}
+function dots(n) { return n === 1 ? 'dot' : 'dots'; }
+function durText(ms) { return (ms / 1000) + ' s'; }
+function listText(arr) {
+  if (arr.length <= 1) return arr.join('');
+  return arr.slice(0, -1).join(', ') + ' and ' + arr[arr.length - 1];
+}
+
+/* ---------- the five-frame: five Booleans, quantity is always derived ---------- */
+function qty(f) { let n = 0; for (let i = 0; i < f.length; i++) if (f[i]) n++; return n; }
+function fkey(f) { return f.map(c => (c ? 1 : 0)).join(''); }
+function validFrame(f) { return Array.isArray(f) && f.length === 5 && f.every(c => typeof c === 'boolean'); }
+function structuredFrame(q) { return [0, 1, 2, 3, 4].map(i => i < q); }
+function variedFrame(q, avoidStructured) {
+  if (avoidStructured === undefined) avoidStructured = true;
+  if (q <= 0) return [false, false, false, false, false];
+  if (q >= 5) return [true, true, true, true, true];
+  let f, tries = 0;
+  do {
+    f = [false, false, false, false, false];
+    shuffle([0, 1, 2, 3, 4]).slice(0, q).forEach(i => { f[i] = true; });
+    tries++;
+  } while (avoidStructured && tries < 8 && fkey(f) === fkey(structuredFrame(q)));
+  return f;
+}
+function makeFrame(q, varied) { return varied ? variedFrame(q) : structuredFrame(q); }
+function allArrangements(q) {
+  const out = [];
+  for (let m = 0; m < 32; m++) {
+    const f = [0, 1, 2, 3, 4].map(i => !!(m & (1 << i)));
+    if (qty(f) === q) out.push(f);
+  }
+  return out;
+}
+function boxesOf(f) { return f.map((c, i) => (c ? i + 1 : 0)).filter(Boolean); }
+function describeFrame(f) {
+  const n = qty(f);
+  return n === 0 ? 'empty frame' : n + ' ' + dots(n) + ' in box' + (n > 1 ? 'es ' : ' ') + listText(boxesOf(f));
+}
+
+/* ---------- picking quantities ---------- */
+function pickQuantity(st, lo, hi, avoid) {
+  let pool = [];
+  for (let i = lo; i <= hi; i++) pool.push(i);
+  if (avoid !== undefined && pool.length > 1) pool = pool.filter(x => x !== avoid);
+  const focus = (st.focus || []).filter(x => pool.includes(x));
+  if (focus.length && Math.random() < 0.7) return focus[rnd(focus.length)];
+  return pool[rnd(pool.length)];
+}
+function numericOptions(correct, count, lo, hi) {
+  const others = [];
+  for (let i = lo; i <= hi; i++) if (i !== correct) others.push(i);
+  const picks = shuffle(others).slice(0, count - 1).concat([correct]);
+  return shuffle(picks).map((v, i) => ({ id: 'o' + i, value: v, label: String(v) }));
+}
+
+/* ---------- question generators ---------- */
+function genQuantity(st, ctx) {
+  const n = pickQuantity(st, 0, 5, ctx.lastQ);
+  const f = makeFrame(n, st.arrangement === 'varied');
+  const options = numericOptions(n, st.choices, 0, 5);
+  return {
+    type: 'quantity', subtype: 'quantity', prompt: 'How many dots did you see?',
+    frames: [f], options, correctId: options.find(o => o.value === n).id, mainQ: n, answerLabel: String(n),
+    explain: {
+      full: 'You saw ' + n + ' ' + dots(n) + '. ' + n + ' filled and ' + (5 - n) + ' empty make 5.',
+      nudge: 'Look for groups you know, like 2 and 1, instead of counting one by one. How many boxes were filled?'
+    }
+  };
+}
+
+function genChange(st, ctx) {
+  const d = CHANGE_ORDER[rnd(5)];
+  const varied = st.arrangement === 'varied';
+  let lo = Math.max(0, -d), hi = Math.min(5, 5 - d);
+  if (d === 0 && varied) { lo = 1; hi = 4; }
+  const a = pickQuantity(st, lo, hi, ctx.lastQ);
+  const b = a + d;
+  const fa = makeFrame(a, varied);
+  let fb = makeFrame(b, varied);
+  if (d === 0 && varied) { let t = 0; while (fkey(fb) === fkey(fa) && t++ < 30) fb = makeFrame(b, true); }
+  const rearranged = d === 0 && fkey(fa) !== fkey(fb);
+  let vals;
+  if (st.choices >= 5) vals = CHANGE_ORDER.slice();
+  else {
+    const keep = shuffle(CHANGE_ORDER.filter(x => x !== d)).slice(0, 2).concat([d]);
+    vals = CHANGE_ORDER.filter(x => keep.includes(x));
+  }
+  const options = vals.map((v, i) => ({ id: 'o' + i, value: v, label: CHANGE_LABEL[String(v)] }));
+  let full;
+  if (d !== 0) full = 'Frame 1 had ' + a + ' ' + dots(a) + ' and frame 2 had ' + b + '. ' + b + ' is ' + CHANGE_LABEL[String(d)].toLowerCase() + ' than ' + a + '.';
+  else if (rearranged) full = 'The arrangement changed, but the quantity stayed the same: both frames had ' + a + ' ' + dots(a) + '.';
+  else full = 'Both frames had ' + a + ' ' + dots(a) + ', so nothing changed.';
+  return {
+    type: 'change', subtype: 'change', prompt: 'How did the quantity change from the first frame to the second?',
+    frames: [fa, fb], options, correctId: options.find(o => o.value === d).id, mainQ: a, answerLabel: CHANGE_LABEL[String(d)],
+    delta: d, rearranged,
+    explain: { full, nudge: 'Compare the two frames. Did the number of dots go up, go down, or stay the same?' }
+  };
+}
+
+function genMissing(st, ctx) {
+  const variant = st.missingVariant === 'more' ? 'more' : st.missingVariant === 'empty' ? 'empty' : (Math.random() < 0.5 ? 'more' : 'empty');
+  const n = pickQuantity(st, 0, variant === 'more' ? 4 : 5, ctx.lastQ);
+  const m = 5 - n;
+  const f = makeFrame(n, st.arrangement === 'varied');
+  const options = numericOptions(m, st.choices, 0, 5);
+  const full = variant === 'more'
+    ? n + ' ' + dots(n) + ' and ' + m + ' more make 5, so ' + m + ' more ' + dots(m) + ' would fill the frame.'
+    : n + ' filled and ' + m + ' empty make 5, so there were ' + m + ' empty ' + (m === 1 ? 'cell' : 'cells') + '.';
+  return {
+    type: 'missing', subtype: variant,
+    prompt: variant === 'more' ? 'How many more dots would fill all five cells?' : 'How many empty cells did you see?',
+    frames: [f], options, correctId: options.find(o => o.value === m).id, mainQ: n, answerLabel: String(m),
+    explain: { full, nudge: 'Think about all 5 boxes. How many were filled, and how many were left over?' }
+  };
+}
+
+function genMemory(st, ctx) {
+  const sub = st.memorySubtype === 'arrangement' ? 'arrangement' : st.memorySubtype === 'quantity' ? 'quantity' : (Math.random() < 0.5 ? 'arrangement' : 'quantity');
+  const need = st.choices >= 5 ? 5 : 3;
+  let target, frames, n;
+  if (sub === 'arrangement') {
+    n = pickQuantity(st, 1, 4, ctx.lastQ);
+    const all = shuffle(allArrangements(n));
+    target = all[0];
+    frames = shuffle([target].concat(all.slice(1, need)));
+  } else {
+    n = pickQuantity(st, 0, 5, ctx.lastQ);
+    const varied = st.arrangement === 'varied';
+    target = makeFrame(n, varied);
+    const qs = shuffle([0, 1, 2, 3, 4, 5].filter(x => x !== n)).slice(0, need - 1);
+    frames = shuffle([target].concat(qs.map(x => makeFrame(x, varied))));
+  }
+  const options = frames.map((f, i) => ({ id: 'o' + i, frame: f, label: 'Frame ' + (i + 1) + ': ' + describeFrame(f) }));
+  const ci = options.findIndex(o => fkey(o.frame) === fkey(target));
+  const full = sub === 'arrangement'
+    ? 'You saw ' + describeFrame(target) + '. Every option had ' + n + ' ' + dots(n) + ', but only one had them in those places.'
+    : 'The frame you saw had ' + n + ' ' + dots(n) + ' and ' + (5 - n) + ' empty. Only one option matches.';
+  return {
+    type: 'memory', subtype: sub,
+    prompt: sub === 'arrangement' ? 'Which frame did you see? All the frames have the same number of dots.' : 'Which frame did you see?',
+    frames: [target], options, correctId: options[ci].id, mainQ: n, answerLabel: 'Frame ' + (ci + 1),
+    explain: {
+      full,
+      nudge: sub === 'arrangement'
+        ? 'Every option has the same number of dots. Try to remember which boxes were filled.'
+        : 'Think about how many dots there were in total, and how many boxes were empty.'
+    }
+  };
+}
+
+/* ---------- validation: recompute every answer from the displayed frames ---------- */
+function computeAnswerIds(q) {
+  const f = q.frames;
+  if (q.type === 'quantity') { const v = qty(f[0]); return q.options.filter(o => o.value === v).map(o => o.id); }
+  if (q.type === 'missing') { const v = 5 - qty(f[0]); return q.options.filter(o => o.value === v).map(o => o.id); }
+  if (q.type === 'change') { const v = qty(f[1]) - qty(f[0]); return q.options.filter(o => o.value === v).map(o => o.id); }
+  if (q.type === 'memory') { const k = fkey(f[0]); return q.options.filter(o => fkey(o.frame) === k).map(o => o.id); }
+  return [];
+}
+function validateQuestion(q, st) {
+  const errs = [];
+  const expectFrames = q.type === 'change' ? 2 : 1;
+  if (!Array.isArray(q.frames) || q.frames.length !== expectFrames || !q.frames.every(validFrame)) errs.push('frames invalid');
+  const expectOpts = st.choices >= 5 ? 5 : 3;
+  if (!q.options || q.options.length !== expectOpts) errs.push('wrong number of options (' + (q.options && q.options.length) + ')');
+  if (errs.length) return errs;
+  const ids = q.options.map(o => o.id);
+  if (new Set(ids).size !== ids.length) errs.push('duplicate ids');
+  if (q.type === 'memory') {
+    if (!q.options.every(o => validFrame(o.frame))) errs.push('option frame invalid');
+    const keys = q.options.map(o => fkey(o.frame));
+    if (new Set(keys).size !== keys.length) errs.push('duplicate memory frames');
+    if (q.subtype === 'arrangement') {
+      const n0 = qty(q.options[0].frame);
+      if (!q.options.every(o => qty(o.frame) === n0)) errs.push('arrangement options differ in quantity');
+    } else {
+      const qs = q.options.map(o => qty(o.frame));
+      if (new Set(qs).size !== qs.length) errs.push('quantity-memory options share a quantity');
+    }
+  } else {
+    const vs = q.options.map(o => o.value);
+    if (new Set(vs).size !== vs.length) errs.push('duplicate option values');
+  }
+  if (q.options.filter(o => o.id === q.correctId).length !== 1) errs.push('correct option missing or repeated');
+  const calc = computeAnswerIds(q);
+  if (calc.length !== 1 || calc[0] !== q.correctId) errs.push('stored answer does not match the displayed frame(s)');
+  return errs;
+}
+
+function makeQuestion(type, st, ctx) {
+  ctx = ctx || {};
+  const gen = { quantity: genQuantity, change: genChange, missing: genMissing, memory: genMemory }[type];
+  for (let i = 0; i < 40; i++) {
+    const q = gen(st, ctx);
+    if (validateQuestion(q, st).length === 0) return q;
+  }
+  throw new Error('Could not build a valid ' + type + ' question');
+}
+
+/* ---------- session schedule ---------- */
+function buildSchedule(st) {
+  const R = st.rounds;
+  if (st.mystery !== 'mixed') return Array(R).fill(st.mystery);
+  const keys = TYPES.concat(['review']);
+  let w = keys.map(k => Math.max(0, st.mix[k] | 0));
+  if (!TYPES.some(k => (st.mix[k] | 0) > 0)) w = [1, 1, 1, 1, w[4] > 0 ? 1 : 0];
+  const total = w.reduce((a, b) => a + b, 0);
+  const exact = w.map(x => x * R / total);
+  const base = exact.map(Math.floor);
+  let left = R - base.reduce((a, b) => a + b, 0);
+  const order = shuffle(keys.map((k, i) => i)).sort((a, b) => (exact[b] - base[b]) - (exact[a] - base[a]));
+  for (let i = 0; i < left; i++) base[order[i]]++;
+  const arr = [];
+  keys.forEach((k, i) => { for (let j = 0; j < base[i]; j++) arr.push(k); });
+  return shuffle(arr);
+}
+function resolveReview(done, st) {
+  const enabled = TYPES.filter(t => ((st.mix && st.mix[t]) | 0) > 0);
+  const pool = enabled.length ? enabled : TYPES;
+  const scored = pool.map(t => {
+    const r = done.filter(x => x.type === t);
+    return { t, n: r.length, p: r.length ? r.filter(x => x.firstTry).length / r.length : null };
+  }).filter(x => x.n > 0);
+  if (!scored.length) return pool[rnd(pool.length)];
+  const min = Math.min.apply(null, scored.map(x => x.p));
+  const c = scored.filter(x => x.p === min);
+  return c[rnd(c.length)].t;
+}
+
+/* ---------- scoring and statistics (never based on speed) ---------- */
+function pointsFor(attempts, hint) { return hint ? 5 : (attempts > 1 ? 7 : 10); }
+function computeStats(records) {
+  const done = records.filter(r => !r.skipped);
+  const s = { attempted: done.length, skipped: records.length - done.length, firstTry: 0, retryCorrect: 0, hintCorrect: 0, incorrect: 0, hints: 0, points: 0, byType: {} };
+  TYPES.forEach(t => { s.byType[t] = { n: 0, firstTry: 0, correct: 0, pct: null }; });
+  done.forEach(r => {
+    const b = s.byType[r.type];
+    b.n++;
+    if (r.firstTry) { s.firstTry++; b.firstTry++; }
+    if (r.correct) {
+      b.correct++;
+      if (r.hint) s.hintCorrect++; else if (!r.firstTry) s.retryCorrect++;
+    } else s.incorrect++;
+    if (r.hint) s.hints++;
+    s.points += r.points || 0;
+  });
+  s.accuracy = done.length ? Math.round(100 * s.firstTry / done.length) : null;
+  TYPES.forEach(t => { const b = s.byType[t]; b.pct = b.n ? Math.round(100 * b.firstTry / b.n) : null; });
+  const seen = TYPES.filter(t => s.byType[t].n > 0);
+  s.best = null;
+  if (seen.length) {
+    const top = Math.max.apply(null, seen.map(t => s.byType[t].pct));
+    s.best = seen.find(t => s.byType[t].pct === top);
+  }
+  s.practiceAgain = seen.filter(t => s.byType[t].pct < 70);
+  return s;
+}
+
+/* ---------- adaptive difficulty (individual practice only; the UI announces every change) ---------- */
+function adaptUp(st) {
+  if (st.arrangement === 'structured') { st.arrangement = 'varied'; return 'Level up: frames now use varied arrangements.'; }
+  const i = DURATIONS.indexOf(st.duration);
+  if (i >= 0 && i < DURATIONS.length - 1) { st.duration = DURATIONS[i + 1]; return 'Level up: frames now flash for ' + durText(st.duration) + '.'; }
+  return null;
+}
+function adaptDown(st) {
+  if (st.arrangement === 'varied') { st.arrangement = 'structured'; return 'Easing back: frames now use structured arrangements.'; }
+  const i = DURATIONS.indexOf(st.duration);
+  if (i > 0) { st.duration = DURATIONS[i - 1]; return 'Easing back: frames now flash for ' + durText(st.duration) + '.'; }
+  return null;
+}
+
+/* ---------- self-check (also used by the acceptance tests) ---------- */
+function runSelfCheck(iters) {
+  iters = iters || 200;
+  const results = [];
+  let fails = 0;
+  const t = (name, fn) => {
+    try {
+      const r = fn();
+      if (r === undefined || r === true) results.push({ name, ok: true });
+      else { fails++; results.push({ name, ok: false, info: String(r) }); }
+    } catch (e) { fails++; results.push({ name, ok: false, info: e.message }); }
+  };
+  t('Frames have exactly five Boolean cells for quantities 0 to 5 (structured and varied)', () => {
+    for (let q = 0; q <= 5; q++) for (let k = 0; k < 20; k++) {
+      for (const varied of [false, true]) {
+        const f = makeFrame(q, varied);
+        if (!validFrame(f)) return 'invalid frame for q=' + q;
+        if (qty(f) !== q) return 'quantity mismatch for q=' + q;
+      }
+    }
+  });
+  t('Structured frames fill from the left', () => {
+    for (let q = 0; q <= 5; q++) if (fkey(structuredFrame(q)) !== '11111'.slice(0, q) + '00000'.slice(0, 5 - q)) return 'bad structured ' + q;
+  });
+  t('Varied frames avoid the left-to-right pattern for 1 to 4 dots', () => {
+    for (let q = 1; q <= 4; q++) { let hits = 0; for (let k = 0; k < 60; k++) if (fkey(variedFrame(q)) === fkey(structuredFrame(q))) hits++; if (hits > 3) return 'too many structured results for q=' + q; }
+  });
+  const arrs = ['structured', 'varied'];
+  TYPES.forEach(type => {
+    [3, 5].forEach(choices => arrs.forEach(arr => {
+      const subs = type === 'memory' ? ['arrangement', 'quantity', 'both'] : type === 'missing' ? ['more', 'empty', 'both'] : [null];
+      subs.forEach(sub => {
+        t(type + ' | ' + choices + ' choices | ' + arr + (sub ? ' | ' + sub : '') + ': ' + iters + ' valid questions', () => {
+          const st = defaultSettings();
+          st.choices = choices; st.arrangement = arr;
+          if (type === 'memory') st.memorySubtype = sub;
+          if (type === 'missing') st.missingVariant = sub;
+          const ctx = {};
+          for (let i = 0; i < iters; i++) {
+            const q = makeQuestion(type, st, ctx);
+            ctx.lastQ = q.mainQ;
+            const e = validateQuestion(q, st);
+            if (e.length) return e.join('; ');
+          }
+        });
+      });
+    }));
+  });
+  t('Every quantity from 0 to 5 can be asked (including zero dots)', () => {
+    for (let n = 0; n <= 5; n++) {
+      const st = defaultSettings(); st.focus = [n];
+      let seen = false;
+      for (let i = 0; i < 200 && !seen; i++) { const q = makeQuestion('quantity', st, {}); if (qty(q.frames[0]) === n) seen = true; }
+      if (!seen) return 'quantity ' + n + ' never generated';
+    }
+  });
+  t('What Changed? computes the right difference and offers all five answers', () => {
+    const st = defaultSettings(); st.choices = 5;
+    const seen = {};
+    for (let i = 0; i < 400; i++) {
+      const q = makeQuestion('change', st, {});
+      const d = qty(q.frames[1]) - qty(q.frames[0]);
+      if (q.options.find(o => o.id === q.correctId).value !== d) return 'wrong delta';
+      seen[d] = true;
+    }
+    if (Object.keys(seen).length !== 5) return 'not every change type appeared';
+  });
+  t('What Changed? "no change" can use a different arrangement in varied mode', () => {
+    const st = defaultSettings(); st.arrangement = 'varied';
+    for (let i = 0; i < 600; i++) { const q = makeQuestion('change', st, {}); if (q.delta === 0 && q.rearranged) return; }
+    return 'never produced a rearranged no-change case';
+  });
+  t('Missing Part answer is 5 minus the occupied cells', () => {
+    const st = defaultSettings();
+    for (let i = 0; i < 300; i++) { const q = makeQuestion('missing', st, {}); if (q.options.find(o => o.id === q.correctId).value !== 5 - qty(q.frames[0])) return 'wrong'; }
+  });
+  t('Memory Match distractors are all distinct from the target (except the answer itself)', () => {
+    const st = defaultSettings();
+    for (let i = 0; i < 300; i++) {
+      const q = makeQuestion('memory', st, {});
+      const k = fkey(q.frames[0]);
+      if (q.options.filter(o => fkey(o.frame) === k).length !== 1) return 'target appears ' + q.options.filter(o => fkey(o.frame) === k).length + ' times';
+    }
+  });
+  t('Scoring: 10 first try, 7 after retry, 5 after hint, no negatives', () => {
+    if (pointsFor(1, false) !== 10 || pointsFor(2, false) !== 7 || pointsFor(1, true) !== 5 || pointsFor(2, true) !== 5) return 'wrong points';
+  });
+  t('Statistics are calculated from the records', () => {
+    const recs = [
+      { type: 'quantity', correct: true, firstTry: true, hint: false, points: 10 },
+      { type: 'quantity', correct: true, firstTry: false, hint: false, points: 7 },
+      { type: 'change', correct: false, firstTry: false, hint: false, points: 0 },
+      { type: 'memory', correct: true, firstTry: false, hint: true, points: 5 },
+      { type: 'missing', skipped: true }
+    ];
+    const s = computeStats(recs);
+    if (s.attempted !== 4 || s.skipped !== 1 || s.firstTry !== 1 || s.retryCorrect !== 1 || s.hintCorrect !== 1 || s.incorrect !== 1 || s.points !== 22) return JSON.stringify(s);
+    if (s.accuracy !== 25 || s.byType.quantity.pct !== 50 || s.byType.change.pct !== 0 || s.byType.missing.pct !== null) return 'percentages wrong';
+    if (s.best !== 'quantity' || s.practiceAgain.indexOf('change') < 0) return 'best / practise-again wrong';
+  });
+  t('Schedules have the right length and never include disabled mystery types', () => {
+    for (let k = 0; k < 200; k++) {
+      const st = defaultSettings();
+      st.rounds = [5, 10, 15, 20][rnd(4)];
+      TYPES.forEach(x => { st.mix[x] = rnd(4); });
+      st.mix.review = rnd(3);
+      const s = buildSchedule(st);
+      if (s.length !== st.rounds) return 'length ' + s.length + ' vs ' + st.rounds;
+      const anyType = TYPES.some(x => st.mix[x] > 0);
+      for (const x of s) {
+        if (x === 'review') { if (st.mix.review === 0) return 'review used when disabled'; continue; }
+        if (anyType && st.mix[x] === 0) return 'disabled type ' + x + ' scheduled';
+      }
+    }
+    const d = defaultSettings(); d.rounds = 10;
+    const s = buildSchedule(d);
+    if (TYPES.concat(['review']).some(x => s.filter(y => y === x).length !== 2)) return 'default 10-round mix is not 2 of each';
+  });
+  t('Single-mystery sessions only use that mystery', () => {
+    const st = defaultSettings(); st.mystery = 'memory'; st.rounds = 15;
+    if (buildSchedule(st).some(x => x !== 'memory')) return 'wrong type';
+  });
+  t('Review rounds only pick enabled types', () => {
+    const st = defaultSettings(); st.mix = { quantity: 0, change: 3, missing: 0, memory: 1, review: 1 };
+    for (let k = 0; k < 100; k++) { const r = resolveReview([{ type: 'change', firstTry: false }], st); if (r !== 'change' && r !== 'memory') return 'picked ' + r; }
+  });
+  t('Adaptive difficulty stays within bounds and announces changes', () => {
+    const st = defaultSettings();
+    for (let i = 0; i < 12; i++) adaptUp(st);
+    if (st.duration !== 500 || st.arrangement !== 'varied') return 'up bound wrong';
+    for (let i = 0; i < 12; i++) adaptDown(st);
+    if (st.duration !== 3000 || st.arrangement !== 'structured') return 'down bound wrong';
+    if (adaptDown(st) !== null) return 'should return null at the floor';
+  });
+  return { results, fails };
+}
+// ==ENGINE END==
+
+/* ======================= UI + GAME CONTROLLER ======================= */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable: carry on */ } }
+};
+const TEAM_STYLE = [{ c: '#0b7a7a', sym: '●' }, { c: '#9a6a00', sym: '▲' }, { c: '#6a4fb3', sym: '■' }, { c: '#b8433a', sym: '◆' }];
+const CLUES = [
+  ['🗝️', 'Brass key'], ['👣', 'Muddy footprint'], ['🧤', 'Lost glove'], ['🔦', 'Torch'], ['📜', 'Torn note'],
+  ['🕯️', 'Candle stub'], ['🧩', 'Puzzle piece'], ['💎', 'Blue gem'], ['🪙', 'Old coin'], ['🎩', 'Top hat'],
+  ['🔑', 'Silver key'], ['🧭', 'Compass'], ['📎', 'Paperclip'], ['🪶', 'Feather'], ['🍪', 'Cookie crumb'],
+  ['🧣', 'Striped scarf'], ['🔔', 'Little bell'], ['🪞', 'Hand mirror'], ['🧸', 'Teddy bear'], ['🎟️', 'Ticket stub']
+];
+const CHANGE_SYM = { '1': '▲', '2': '▲▲', '-1': '▼', '-2': '▼▼', '0': '＝' };
+const REVIEW_TIPS = {
+  quantity: 'Quantity Mystery: flash a little longer, then ask "How did you know?" Look for groups like 2 and 1 instead of counting.',
+  change: 'What Changed?: show one more and one less with counters or a real five-frame, then try again.',
+  missing: 'Missing Part: practise "how many more to make five" with fingers or counters.',
+  memory: 'Memory Match: slow the flash, use structured frames, and talk about where the dots were.'
+};
+const SKIP_REASONS = ['Class needs a break', 'Technical problem', 'Question was unclear', 'Out of time', 'Other'];
+
+function loadSettings() {
+  const d = defaultSettings();
+  const s = store.get('fd.settings', null);
+  if (!s || typeof s !== 'object') return d;
+  const m = Object.assign(d, s);
+  m.mix = Object.assign(defaultSettings().mix, s.mix || {});
+  const dt = defaultSettings().teams;
+  m.teams = dt.map((t, i) => Object.assign({}, t, (s.teams && s.teams[i]) || {}));
+  if (!Array.isArray(m.focus)) m.focus = [];
+  return m;
+}
+const App = { screen: 'welcome', settings: loadSettings(), session: null, modal: null, drawer: false, report: null, selfCheck: null, practiceDone: false };
+function saveSettings() { store.set('fd.settings', App.settings); }
+
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function announce(t) { const el = document.getElementById('live'); if (el) { el.textContent = ''; setTimeout(() => { el.textContent = t; }, 30); } }
+let toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.innerHTML = '<div>' + esc(msg) + '</div>';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.innerHTML = ''; }, 4200);
+}
+let AC = null;
+function tone(kind) {
+  const S = App.session;
+  if (!S || !S.st.audio) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    const seq = kind === 'ok' ? [[523, 0], [784, 0.12]] : [[330, 0], [294, 0.14]];
+    seq.forEach(p => {
+      const o = AC.createOscillator(), g = AC.createGain();
+      o.type = 'sine'; o.frequency.value = p[0]; g.gain.value = 0.07;
+      o.connect(g); g.connect(AC.destination);
+      o.start(AC.currentTime + p[1]); o.stop(AC.currentTime + p[1] + 0.16);
+    });
+  } catch (e) { /* audio is optional */ }
+}
+function mysteryName(m) { return m === 'mixed' ? 'Mixed Detective' : TYPE_NAME[m]; }
+
+/* ---------- timer controller: every timer is tracked so pause, restart and exit can cancel them all ---------- */
+const Timers = {
+  ids: new Set(), rafs: new Set(),
+  later(fn, ms) { const id = setTimeout(() => { this.ids.delete(id); fn(); }, ms); this.ids.add(id); return id; },
+  /* hides the frame by measuring from the first painted frame; a safety timeout covers throttled animation frames */
+  flash(ms, fn) {
+    let done = false;
+    const finish = () => { if (done) return; done = true; fn(); };
+    const r1 = requestAnimationFrame(() => {
+      const t0 = performance.now();
+      const loop = () => {
+        if (done) return;
+        if (performance.now() - t0 >= ms - 8) { finish(); return; }
+        this.rafs.add(requestAnimationFrame(loop));
+      };
+      loop();
+    });
+    this.rafs.add(r1);
+    this.later(finish, ms + 350);
+  },
+  clear() {
+    this.ids.forEach(id => clearTimeout(id)); this.ids.clear();
+    this.rafs.forEach(id => cancelAnimationFrame(id)); this.rafs.clear();
+  }
+};
+
+/* ---------- five-frame component ---------- */
+function frameHTML(f, cls, label, hiEmpty) {
+  const n = qty(f);
+  const aria = label || ('Five-frame with ' + n + ' ' + dots(n) + (n ? ', in boxes ' + listText(boxesOf(f)) : ''));
+  return '<div class="frame ' + (cls || '') + '" role="img" aria-label="' + esc(aria) + '">' +
+    f.map(c => '<div class="cell' + (hiEmpty && !c ? ' hi' : '') + '">' + (c ? '<span class="dot"></span>' : '') + '</div>').join('') + '</div>';
+}
+
+/* ======================= SCREENS ======================= */
+const DETECTIVE_SVG = '<svg viewBox="0 0 220 260" role="img" aria-label="Friendly detective with a magnifying glass"><path d="M18 262 C18 192 60 170 110 170 C160 170 202 192 202 262Z" fill="#0b7a7a" stroke="#14213d" stroke-width="5"/><path d="M88 172 L110 205 L132 172Z" fill="#fff" stroke="#14213d" stroke-width="4"/><path d="M104 200 L110 232 L116 200Z" fill="#f5b82e" stroke="#14213d" stroke-width="3"/><circle cx="110" cy="112" r="52" fill="#f6d2a8" stroke="#14213d" stroke-width="5"/><path d="M54 100 C54 44 166 44 166 100Z" fill="#14213d"/><rect x="40" y="96" width="140" height="14" rx="7" fill="#14213d"/><rect x="58" y="80" width="104" height="9" fill="#f5b82e"/><circle cx="90" cy="124" r="6" fill="#14213d"/><circle cx="130" cy="124" r="6" fill="#14213d"/><path d="M92 144 Q110 160 128 144" fill="none" stroke="#14213d" stroke-width="5" stroke-linecap="round"/><line x1="150" y1="226" x2="126" y2="250" stroke="#14213d" stroke-width="12" stroke-linecap="round"/><circle cx="170" cy="200" r="34" fill="rgba(255,255,255,.6)" stroke="#f5b82e" stroke-width="9"/><circle cx="170" cy="200" r="38" fill="none" stroke="#14213d" stroke-width="3"/></svg>';
+
+function welcomeHTML() {
+  const s = App.settings;
+  const today = '<b>' + esc(mysteryName(s.mystery)) + '</b>, ' + durText(s.duration) + ' flash, ' + s.rounds + ' rounds, ' + PRESETS[s.difficulty].name;
+  return '<main class="welcome">' +
+    '<div><h1>FRAME DETECTIVE</h1><p class="tagline">One glance. One mystery. Can you crack the case?</p>' +
+    '<div class="todays">Today\'s case: ' + today + '</div>' +
+    '<div class="w-actions"><button class="btn gold big" data-act="start" data-autofocus data-fid="start">Start investigation</button>' +
+    '<button class="btn ghost" data-act="go-setup" data-fid="w-setup">Teacher setup</button>' +
+    '<button class="btn ghost" data-act="go-howto" data-fid="w-how">How to play</button>' +
+    '<button class="btn ghost" data-act="go-results" data-fid="w-res">Last case report</button></div>' +
+    '<p class="muted" style="margin-top:18px;font-size:1rem">Train your eyes. Trust your number sense.</p></div>' +
+    '<div class="casefile"><div class="who">' + DETECTIVE_SVG + '<p class="says">I spy a mystery in the five-frame lab. How many dots do you see?</p></div>' +
+    '<div class="mag">' + frameHTML([true, true, false, true, false], '', 'Example five-frame with three dots') + '<span class="lens-ring" aria-hidden="true"></span></div></div>' +
+    '</main>';
+}
+
+function howtoHTML() {
+  const mys = [
+    ['Quantity Mystery', 'How many dots did you see?', [true, true, true, false, false]],
+    ['What Changed?', 'Two frames flash one after the other. Was it one more, two less, or no change?', [true, true, false, false, false]],
+    ['Missing Part', 'How many more dots would fill all five cells?', [true, true, true, false, false]],
+    ['Memory Match', 'Which frame did you see? Sometimes the dots are the same but the places are different.', [true, false, true, false, true]]
+  ];
+  return '<div class="screen scroll"><div class="page">' +
+    '<div class="pagehead"><button class="btn sm ghost" data-act="go-welcome" data-fid="back">Back</button><h1>How to play</h1></div>' +
+    '<div class="steps">' +
+    '<div class="card"><span class="n">1</span><h3>Observe</h3><p>A five-frame flashes on the board for a short time.</p>' + frameHTML([true, true, true, false, false], 'sm') + '</div>' +
+    '<div class="card"><span class="n">2</span><h3>Remember</h3><p>The frame disappears. Hold the picture in your head.</p><div class="hid" aria-hidden="true">🔎</div></div>' +
+    '<div class="card"><span class="n">3</span><h3>Investigate</h3><p>Answer the mystery question. Take as long as you need.</p><div class="ex-opts" aria-hidden="true"><span>2</span><span>3</span><span>4</span></div></div>' +
+    '<div class="card"><span class="n">4</span><h3>Solve</h3><p>A correct answer reveals a clue and earns points. A mistake is a chance to look again.</p><div class="slots"><span class="slot found" aria-hidden="true">🗝️</span><span class="slot found" aria-hidden="true">👣</span><span class="slot" aria-hidden="true">?</span></div></div>' +
+    '</div>' +
+    '<div class="card"><h3>Four kinds of mystery</h3><div class="mysteries">' +
+    mys.map(m => '<div><h3>' + m[0] + '</h3><p class="muted" style="margin-bottom:8px">' + m[1] + '</p>' + frameHTML(m[2], 'xs') + '</div>').join('') +
+    '</div></div>' +
+    '<div class="card"><h3>Good to know</h3><ul class="rules"><li>The five boxes are fixed places. Each dot is one counter.</li><li>The flash time is set by the teacher. How long you take to answer never costs points.</li><li>Keyboard: number keys choose an answer, Space shows the frame, Esc pauses.</li></ul></div>' +
+    '<div><button class="btn gold big" data-act="start" data-fid="how-start">Start investigation</button></div>' +
+    '</div></div>';
+}
+
+function briefingHTML() {
+  const done = App.practiceDone;
+  const delay = i => ' style="animation-delay:' + (i * 0.7) + 's"';
+  return '<div class="screen scroll"><div class="page">' +
+    '<div class="pagehead"><button class="btn sm ghost" data-act="go-welcome" data-fid="back">Back</button><h1>Case briefing</h1></div>' +
+    (done
+      ? '<div class="banner ok" role="status"><span class="ico" aria-hidden="true">✓</span><div><h2>Practice complete!</h2><p>Nothing was scored. You are ready for the real case.</p></div></div>'
+      : '<div class="speech fade"' + delay(0) + '>"Detectives, a mystery has appeared in the five-frame lab! Look carefully, remember what you see and solve each case."</div>') +
+    '<div class="grid2"><div class="card"><div class="mag" style="--frame-bg:var(--frame-bg)">' + frameHTML([true, true, true, false, false], '', 'Example five-frame with three dots') + '</div>' +
+    '<div class="labels"><span>▲ 5 boxes, always in the same places</span><span>● 1 dot = 1 counter</span></div></div>' +
+    '<div class="card"><h3>How a case works</h3><ol class="rules">' +
+    ['The frame flashes for a moment, then disappears.', 'Answer after the frame has gone.', 'Correct answers reveal a clue.', 'A mistake is a chance to investigate again.'].map((t, i) => '<li class="fade"' + delay(done ? 0 : i + 1) + '>' + t + '</li>').join('') +
+    '</ol></div></div>' +
+    '<div class="w-actions">' +
+    (done ? '' : '<button class="btn ghost" data-act="briefing-practice" data-fid="practice" data-autofocus>Try a practice round</button>') +
+    '<button class="btn gold big" data-act="briefing-start" data-fid="brief-start"' + (done ? ' data-autofocus' : '') + '>Start the case</button></div>' +
+    '<button class="tgl" role="switch" aria-checked="' + (!App.settings.showBriefing) + '" data-act="toggle" data-key="showBriefing" data-invert="1" data-fid="tgl-brief"><span class="sw"></span><span><b>Skip this briefing next time</b><small>You can turn it back on in Teacher setup.</small></span></button>' +
+    '</div></div>';
+}
+
+/* ---------- teacher setup ---------- */
+function seg(key, opts, cur) {
+  return '<div class="seg" role="group">' + opts.map(o =>
+    '<button class="segbtn" data-act="set" data-key="' + key + '" data-val="' + o[0] + '" data-t="' + typeof o[0] + '" aria-pressed="' + (String(cur) === String(o[0])) + '" data-fid="set-' + key + '-' + o[0] + '">' + o[1] + '</button>').join('') + '</div>';
+}
+function tgl(key, label, desc, cur) {
+  return '<button class="tgl" role="switch" aria-checked="' + !!cur + '" data-act="toggle" data-key="' + key + '" data-fid="tgl-' + key + '"><span class="sw"></span><span><b>' + label + '</b><small>' + desc + '</small></span></button>';
+}
+function presetDiffers(s) {
+  const p = PRESETS[s.difficulty];
+  return p.duration !== s.duration || p.arrangement !== s.arrangement || p.choices !== s.choices;
+}
+function setupHTML() {
+  const s = App.settings;
+  const hasMemory = s.mystery === 'memory' || (s.mystery === 'mixed' && s.mix.memory > 0);
+  const hasMissing = s.mystery === 'missing' || (s.mystery === 'mixed' && s.mix.missing > 0);
+  const hasChange = s.mystery === 'change' || (s.mystery === 'mixed' && s.mix.change > 0);
+  const mix = [['quantity', 'Quantity Mystery'], ['change', 'What Changed?'], ['missing', 'Missing Part'], ['memory', 'Memory Match'], ['review', 'Review (weakest type so far)']];
+  const typeSum = TYPES.reduce((a, t) => a + s.mix[t], 0);
+  let h = '<div class="screen"><div class="scroll"><div class="page">' +
+    '<div class="pagehead"><button class="btn sm ghost" data-act="go-welcome" data-fid="back">Back</button><h1>Teacher setup</h1></div>' +
+    '<div class="grid2"><div style="display:flex;flex-direction:column;gap:22px">' +
+    /* mystery */
+    '<div class="card"><h3>Mystery type</h3><div class="field">' +
+    seg('mystery', [['quantity', 'Quantity Mystery'], ['change', 'What Changed?'], ['missing', 'Missing Part'], ['memory', 'Memory Match'], ['mixed', 'Mixed Detective']], s.mystery) + '</div>';
+  if (s.mystery === 'mixed') {
+    h += '<div class="field"><span class="lbl">Mix of mysteries</span><p class="sub">Numbers are proportions. A 10-round case with 2 of each gives 2 rounds of each type. Set a type to 0 to leave it out.</p>' +
+      mix.map(m => '<div class="stepper"><span>' + m[1] + '</span><button data-act="mix" data-key="' + m[0] + '" data-d="-1" aria-label="Fewer ' + m[1] + '" data-fid="mix-' + m[0] + '-m"' + ((s.mix[m[0]] <= 0 || (TYPES.includes(m[0]) && s.mix[m[0]] === 1 && typeSum === 1)) ? ' disabled' : '') + '>−</button><b>' + s.mix[m[0]] + '</b><button data-act="mix" data-key="' + m[0] + '" data-d="1" aria-label="More ' + m[1] + '" data-fid="mix-' + m[0] + '-p"' + (s.mix[m[0]] >= 5 ? ' disabled' : '') + '>+</button></div>').join('') + '</div>';
+  }
+  if (hasMemory) h += '<div class="field"><span class="lbl">Memory Match type</span>' + seg('memorySubtype', [['arrangement', 'Same dots, new places'], ['quantity', 'Different quantities'], ['both', 'Both']], s.memorySubtype) + '<p class="sub" style="margin-top:6px">Arrangement memory always uses varied positions, because it needs the places to differ.</p></div>';
+  if (hasMissing) h += '<div class="field"><span class="lbl">Missing Part question</span>' + seg('missingVariant', [['more', 'How many more?'], ['empty', 'How many empty?'], ['both', 'Both']], s.missingVariant) + '</div>';
+  if (hasChange) h += tgl('revealChange', 'Show both frames again after the answer', 'Helps the class check the change. Turn off to keep it a pure memory task.', s.revealChange);
+  h += '</div>' +
+    /* difficulty */
+    '<div class="card"><h3>Difficulty</h3><p class="sub">A starting point only. Presets set the flash time, frame arrangement and number of choices, and you can change each one below.</p><div class="diffs">' +
+    Object.keys(PRESETS).map(k => { const p = PRESETS[k]; return '<button class="segbtn" data-act="set" data-key="difficulty" data-val="' + k + '" data-t="string" aria-pressed="' + (s.difficulty === k) + '" data-fid="diff-' + k + '">' + p.name + '<small>' + durText(p.duration) + ', ' + p.arrangement + ', ' + p.choices + ' choices</small></button>'; }).join('') + '</div>' +
+    (presetDiffers(s) ? '<p class="muted" style="margin-top:10px;font-weight:700">Custom settings: you have changed some values from the preset.</p>' : '') + '</div>' +
+    /* display */
+    '<div class="card"><h3>Frame and rounds</h3>' +
+    '<div class="field"><span class="lbl">Frame display time</span>' + seg('duration', DURATIONS.map(d => [d, durText(d)]), s.duration) + '<p class="sub" style="margin-top:6px">This is only how long the frame is visible. Answering is never timed.</p></div>' +
+    '<div class="field"><span class="lbl">Number of rounds</span>' + seg('rounds', [5, 10, 15, 20].map(n => [n, String(n)]), s.rounds) + '</div>' +
+    '<div class="field"><span class="lbl">Answer choices</span>' + seg('choices', [[3, '3 options'], [5, '5 options']], s.choices) + '</div>' +
+    '<div class="field"><span class="lbl">Frame arrangements</span>' + seg('arrangement', [['structured', 'Structured (left to right)'], ['varied', 'Varied positions']], s.arrangement) + '</div>' +
+    '<div class="field"><span class="lbl">Practise these quantities more (optional)</span><div class="seg">' + [0, 1, 2, 3, 4, 5].map(n => '<button class="segbtn" data-act="focus" data-val="' + n + '" aria-pressed="' + s.focus.includes(n) + '" data-fid="focus-' + n + '">' + n + '</button>').join('') + '</div><p class="sub" style="margin-top:6px">With none selected, all quantities from 0 to 5 appear equally.</p></div></div>' +
+    '</div><div style="display:flex;flex-direction:column;gap:22px">' +
+    /* response */
+    '<div class="card"><h3>Who answers</h3><div class="field">' + seg('response', [['class', 'Whole-class vote'], ['teams', 'Team Detective'], ['individual', 'Individual']], s.response) + '</div>';
+  if (s.response === 'teams') {
+    h += '<div class="field"><span class="lbl">Number of teams</span>' + seg('teamCount', [2, 3, 4].map(n => [n, String(n)]), s.teamCount) + '</div><div class="field"><span class="lbl">Team names</span>' +
+      s.teams.slice(0, s.teamCount).map((t, i) => '<div class="stepper"><span class="teamchip" style="color:' + TEAM_STYLE[i].c + '"><b aria-hidden="true">' + TEAM_STYLE[i].sym + '</b></span><input type="text" maxlength="16" value="' + esc(t.name) + '" data-team="' + i + '" aria-label="Name of team ' + (i + 1) + '"></div>').join('') + '<p class="sub">Teams take turns, but everyone can work out the answer before the team representative taps.</p></div>';
+  }
+  if (s.response === 'class') h += '<p class="sub">Everyone thinks silently, the class agrees an answer, and one student taps it.</p>';
+  if (s.response === 'individual') h += '<p class="sub">One player works at their own pace. Nothing identifies the player.</p>';
+  h += '</div>' +
+    /* flow */
+    '<div class="card"><h3>Game flow</h3>' +
+    '<div class="field"><span class="lbl">Feedback</span>' + seg('feedback', [['immediate', 'Immediately on tap'], ['delayed', 'After the class responds']], s.feedback) + '<p class="sub" style="margin-top:6px">After the class responds: the answer is chosen first, then you press Check answer.</p></div>' +
+    '<div class="field"><span class="lbl">Next round</span>' + seg('next', [['teacher', 'Teacher-controlled'], ['auto', 'Automatic sequence']], s.next) + '</div>' +
+    tgl('retry', 'Allow one retry', 'After a wrong answer the class can try again or look at the frame again.', s.retry) +
+    tgl('hints', 'Hints', 'A hint rules out some wrong answers. A correct answer after a hint is worth 5 points.', s.hints) +
+    tgl('adaptive', 'Adaptive difficulty', s.response === 'individual' ? 'Moves between structured and varied frames, and flash times, after streaks. Every change is announced.' : 'Only available in Individual mode. Whole-class and team games keep one level for everyone.', s.adaptive && s.response === 'individual').replace('data-act="toggle"', 'data-act="toggle"' + (s.response === 'individual' ? '' : ' disabled')) +
+    '</div>' +
+    '<div class="card"><h3>Comfort</h3>' +
+    tgl('audio', 'Sound effects', 'Off by default. Everything works without sound.', s.audio) +
+    tgl('reducedMotion', 'Reduced motion', 'Removes animations. The game also follows your device setting.', s.reducedMotion) +
+    tgl('showBriefing', 'Show the case briefing before each case', 'A short introduction and a practice round.', s.showBriefing) + '</div>' +
+    '<div class="card"><h3>Engine check</h3><p class="sub">Generates hundreds of questions per mystery and confirms every frame, answer and option set is valid.</p>' +
+    '<div class="w-actions"><button class="btn sm ghost" data-act="selfcheck" data-fid="selfcheck">Run engine check</button><button class="btn sm ghost" data-act="defaults" data-fid="defaults">Reset all settings</button></div>' +
+    (App.selfCheck ? '<p style="margin-top:10px;font-weight:800" class="' + (App.selfCheck.fails ? 'warn' : '') + '">' + (App.selfCheck.fails ? App.selfCheck.fails + ' of ' + App.selfCheck.results.length + ' checks failed' : 'All ' + App.selfCheck.results.length + ' checks passed ✓') + '</p><ul class="check">' + App.selfCheck.results.filter(r => !r.ok).map(r => '<li class="f">✗ ' + esc(r.name) + ': ' + esc(r.info) + '</li>').join('') + '</ul>' : '') + '</div>' +
+    '</div></div></div></div>' +
+    '<div class="stickybar"><span class="muted" style="font-weight:700">' + esc(mysteryName(s.mystery)) + ', ' + durText(s.duration) + ' flash, ' + s.rounds + ' rounds</span>' +
+    '<button class="btn gold big" data-act="start-case" data-fid="start-case">Start case</button></div></div>';
+  return h;
+}
+
+/* ---------- game screen ---------- */
+function teamChip(st, i) {
+  if (st.response !== 'teams' || i == null) return '';
+  const t = st.teams[i], sty = TEAM_STYLE[i];
+  return '<span class="teamchip" style="color:' + sty.c + '"><b aria-hidden="true">' + sty.sym + '</b><span style="color:var(--ink)">Team ' + esc(t.name) + '</span></span>';
+}
+function topHTML(S) {
+  const R = S.round, st = S.st;
+  const done = S.idx + (R.resolved ? 1 : 0);
+  const label = S.practice ? 'Practice round' : 'CASE FILE ' + String(S.caseNo).padStart(2, '0');
+  return '<header class="top"><span class="stamp">' + label + '</span>' +
+    '<span class="rnd">' + (S.practice ? 'No points' : 'Round ' + R.n + ' of ' + st.rounds) + '</span>' +
+    (S.practice ? '' : '<span class="track" role="progressbar" aria-label="Case progress" aria-valuemin="0" aria-valuemax="' + st.rounds + '" aria-valuenow="' + done + '"><i style="width:' + Math.round(100 * done / st.rounds) + '%"></i></span>') +
+    (S.state === 'PAUSED' ? '' : teamChip(st, R.team)) + '<span class="sp"></span>' +
+    '<button class="btn sm ghost" data-act="pause" data-fid="pause" aria-label="Pause">⏸ Pause</button>' +
+    '<button class="btn sm ghost" data-act="drawer" data-fid="drawer" aria-expanded="' + App.drawer + '">Teacher</button>' +
+    '<button class="btn sm ghost" data-act="exit" data-fid="exit">Exit</button></header>';
+}
+function bottomHTML(S) {
+  const st = S.st;
+  if (S.practice) return '<footer class="prog"><span class="lab">Practice only. Nothing is scored.</span></footer>';
+  const slots = [];
+  for (let i = 0; i < st.rounds; i++) {
+    const c = S.clues[i];
+    slots.push(c ? '<span class="slot found" title="' + esc(c[1]) + '" aria-label="Clue found: ' + esc(c[1]) + '">' + c[0] + '</span>' : '<span class="slot" aria-label="Clue not found yet">?</span>');
+  }
+  const teams = st.response === 'teams' ? st.teams.slice(0, st.teamCount).map((t, i) => '<span class="teamchip" style="color:' + TEAM_STYLE[i].c + '"><b aria-hidden="true">' + TEAM_STYLE[i].sym + '</b><span style="color:var(--ink)">' + esc(t.name) + ' ' + S.teamScores[i] + '</span></span>').join('') : '';
+  return '<footer class="prog"><span class="lab">' + S.clues.length + ' clue' + (S.clues.length === 1 ? '' : 's') + ' found</span><div class="slots">' + slots.join('') + '</div><span class="sp"></span>' + teams +
+    '<span class="pill">Points <b>' + S.score + '</b></span><span class="pill">Stamps <b>' + S.stamps + '</b></span></footer>';
+}
+function optionsHTML(S, R, review) {
+  const q = R.q, n = q.options.length;
+  const cls = q.type === 'memory' ? 'frames' : q.type === 'change' ? 'words' : 'nums';
+  return '<div class="opts ' + cls + '" style="--n:' + n + '" role="group" aria-label="Answer choices">' + q.options.map((o, i) => {
+    const wrong = R.wrong.includes(o.id), removed = R.removed.includes(o.id), isCorrect = o.id === q.correctId;
+    let c = 'opt', tag = '';
+    if (review) {
+      if (R.resolved && isCorrect) { c += ' right'; tag = '✓ ' + (q.type === 'memory' ? 'You saw this one' : 'Correct answer'); }
+      else if (wrong) { c += ' wrong'; tag = '✗ Not this one'; }
+    } else if (wrong) { c += ' wrong'; tag = '✗ Not this one'; }
+    else if (removed) { c += ' removed'; tag = 'Ruled out'; }
+    else if (R.selected === o.id) { c += ' sel'; tag = '✓ Selected'; }
+    const dis = review || wrong || removed;
+    let inner;
+    if (q.type === 'memory') inner = '<span class="key">' + (i + 1) + '</span>' + frameHTML(o.frame, 'sm', o.label);
+    else if (q.type === 'change') inner = '<span class="key">' + (i + 1) + '</span><span class="sym" aria-hidden="true">' + CHANGE_SYM[o.value] + '</span><span class="word">' + o.label + '</span>';
+    else inner = '<span class="num">' + o.label + '</span>';
+    return '<button class="' + c + '" data-act="pick" data-id="' + o.id + '" data-fid="pick-' + o.id + '"' + (dis ? ' disabled' : '') + ' aria-label="' + esc(q.type === 'memory' ? o.label : o.label) + (tag ? ', ' + tag : '') + '"' + (R.selected === o.id && !review ? ' aria-pressed="true"' : '') + '>' + inner + (tag ? '<span class="tag">' + tag + '</span>' : '') + '</button>';
+  }).join('') + '</div>';
+}
+function revealHTML(R, teacher) {
+  const q = R.q, f = q.frames;
+  if (q.type === 'change') {
+    return '<div class="reveal"><div class="frames-row"><div><p class="cap">Frame 1: ' + qty(f[0]) + ' ' + dots(qty(f[0])) + '</p>' + frameHTML(f[0], 'sm') + '</div><div><p class="cap">Frame 2: ' + qty(f[1]) + ' ' + dots(qty(f[1])) + '</p>' + frameHTML(f[1], 'sm') + '</div></div></div>';
+  }
+  const n = qty(f[0]);
+  const cap = q.type === 'missing' ? n + ' filled, ' + (5 - n) + ' empty (the empty cells are marked +)' : (teacher ? 'The teacher revealed the frame: ' : 'The frame you saw: ') + n + ' ' + dots(n);
+  return '<div class="reveal"><div class="frame-wrap md">' + frameHTML(f[0], 'sm', null, q.type === 'missing') + '</div><p class="cap">' + cap + '</p></div>';
+}
+function feedbackCopy(R) {
+  const q = R.q;
+  if (R.correct) {
+    let title, msg;
+    if (q.type === 'quantity') { title = 'Case cracked!'; msg = 'You recognised the quantity.'; }
+    else if (q.type === 'change') { if (q.rearranged) { title = 'Sharp eyes!'; msg = 'The arrangement changed, but the quantity stayed the same.'; } else { title = 'You spotted the change!'; msg = 'You tracked how the quantity changed.'; } }
+    else if (q.type === 'missing') { title = 'You found the missing part!'; msg = 'You worked out how the frame makes 5.'; }
+    else { title = 'Memory expert!'; msg = q.subtype === 'arrangement' ? 'You remembered where the dots were.' : 'You remembered the quantity.'; }
+    if (R.attempts > 1) msg = 'Good thinking on the second go. ' + msg;
+    return { title, msg };
+  }
+  if (!R.resolved) return { title: 'Good investigation. Look again!', msg: 'Not quite yet. Here is a clue to think about.' };
+  return { title: 'Good investigation.', msg: 'Let\'s look at the number relationship together.' };
+}
+function stageHTML(S) {
+  const R = S.round, q = R.q, st = S.st;
+  const hiddenCard = (a, b) => '<div class="hidden-card"><span class="big" aria-hidden="true">🔎</span><strong>' + a + '</strong><span class="muted">' + b + '</span></div>';
+  switch (S.state) {
+    case 'READY': {
+      const note = S.practice ? '<span class="note">Practice round: no points</span>' : '';
+      if (S.countdown) return '<div class="inner">' + note + '<h2 class="h-xl">Get ready</h2><div class="count" aria-live="assertive">' + S.countdown + '</div><p class="muted">The frame flashes for ' + durText(st.duration) + '.</p></div>';
+      return '<div class="inner">' + note + '<h2 class="h-xl">Ready, detectives?</h2>' +
+        (st.response === 'teams' ? '<p style="font-size:1.2rem;font-weight:800">' + teamChip(st, R.team) + ' is up. Everyone can work out the answer.</p>' : '') +
+        '<p style="font-size:1.2rem;max-width:640px">Look closely. The frame flashes for ' + durText(st.duration) + ' and then disappears.' + (q.frames.length > 1 ? ' You will see two frames, one after the other.' : '') + '</p>' +
+        '<div class="lens" aria-hidden="true">🔎</div><button class="btn gold big" data-act="flash" data-autofocus data-fid="flash">Show the frame</button></div>';
+    }
+    case 'FLASH':
+      return '<div class="inner"><h2 class="phase">Observe the frame</h2><p style="font-size:1.2rem;font-weight:800">Remember the pattern!</p><div class="frame-wrap">' + frameHTML(q.frames[S.flashIndex]) + '</div>' +
+        (q.frames.length > 1 ? '<p class="muted">Frame ' + (S.flashIndex + 1) + ' of ' + q.frames.length + '</p>' : '') + '</div>';
+    case 'RECALL': {
+      const more = S.flashIndex < q.frames.length - 1;
+      return '<div class="inner">' + hiddenCard(more ? 'Next frame coming…' : 'The frame is hidden', more ? 'Remember what you saw.' : 'What did you see?') + '</div>';
+    }
+    case 'QUESTION':
+    case 'RESPONSE': {
+      const delayed = st.feedback === 'delayed';
+      const left = q.options.filter(o => o.id !== q.correctId && !R.wrong.includes(o.id) && !R.removed.includes(o.id)).length;
+      const canHint = st.hints && !R.hint && left > 1;
+      return '<div class="inner">' + (R.revealed ? revealHTML(R, true) : '') + '<h2 class="q">' + esc(q.prompt) + '</h2>' + optionsHTML(S, R, false) +
+        '<div class="resp-actions">' +
+        (delayed ? '<button class="btn gold" data-act="check" data-fid="check"' + (R.selected ? '' : ' disabled') + '>Check answer</button>' : '') +
+        (canHint ? '<button class="btn ghost" data-act="hint" data-fid="hint">Hint (a correct answer is then worth 5 points)</button>' : '') + '</div>' +
+        (R.hint ? '<p class="hintnote">Hint: some wrong answers are ruled out. ' + esc(q.explain.nudge) + '</p>' : '') +
+        '<p class="muted tip">' + (delayed ? 'Talk it over, choose an answer, then press Check answer.' : (st.response === 'teams' ? 'Everyone thinks it through, then ' + 'Team ' + esc(st.teams[R.team].name) + ' taps the answer.' : 'Tap your answer. Trust what you remember.')) + '</p></div>';
+    }
+    case 'FEEDBACK': {
+      const fc = feedbackCopy(R), ok = R.correct, pending = !R.resolved;
+      const last = S.idx + 1 >= st.rounds;
+      const teamTxt = ok && st.response === 'teams' ? '<p class="muted">' + esc('Points for Team ' + st.teams[R.team].name) + '</p>' : '';
+      const showReveal = (R.resolved && !(q.type === 'memory') && !(q.type === 'change' && !st.revealChange)) || R.revealed;
+      const reveal = showReveal && !(q.type === 'memory' && R.resolved) ? revealHTML(R, R.revealed && !R.resolved) : '';
+      let acts;
+      if (pending) acts = '<button class="btn gold" data-act="retry" data-autofocus data-fid="retry">Try again</button><button class="btn ghost" data-act="flashagain" data-fid="flashagain">Flash again</button><button class="btn ghost" data-act="showanswer" data-fid="showanswer">Show the answer</button>';
+      else acts = '<button class="btn gold big" data-act="next" data-autofocus data-fid="next">' + (last ? (S.practice ? 'Finish practice' : 'See the case report') : 'Next case') + '</button>';
+      return '<div class="inner"><div class="banner ' + (ok ? 'ok' : 'bad') + '" role="status"><span class="ico" aria-hidden="true">' + (ok ? '✓' : '✗') + '</span><div><h2>' + fc.title + '</h2><p>' + fc.msg + '</p></div>' + (ok && !S.practice ? '<span class="pts">+' + R.pts + '</span>' : '') + '</div>' + teamTxt +
+        '<p class="explain">' + esc(pending ? q.explain.nudge : q.explain.full) + '</p>' + reveal +
+        (q.type === 'memory' || pending ? optionsHTML(S, R, true) : '') +
+        (ok && R.clue && !S.practice ? '<div class="cluecard"><span class="em" aria-hidden="true">' + R.clue[0] + '</span><span>Clue found: ' + esc(R.clue[1]) + '</span></div>' : '') +
+        '<div class="resp-actions">' + acts + '</div></div>';
+    }
+    default:
+      return '<div class="inner">' + hiddenCard('Paused', 'The frame is hidden while the game is paused.') + '</div>';
+  }
+}
+function drawerHTML(S) {
+  const R = S.round, st = S.st, stats = computeStats(S.records);
+  const busy = S.state === 'FLASH' || S.state === 'RECALL';
+  const canReveal = !R.revealed && (S.state === 'QUESTION' || S.state === 'RESPONSE' || (S.state === 'FEEDBACK' && !R.resolved));
+  return '<aside class="drawer" aria-label="Teacher controls"><header><h3>Teacher controls</h3><button class="btn sm ghost" data-act="drawer" data-fid="drawer-x" aria-label="Close teacher controls">Close</button></header><div class="body">' +
+    '<dl><dt>Mode</dt><dd>' + esc(S.practice ? 'Practice' : mysteryName(st.mystery)) + '</dd><dt>This round</dt><dd>' + TYPE_NAME[R.q.type] + (R.q.type === 'memory' || R.q.type === 'missing' ? ' (' + R.q.subtype + ')' : '') + '</dd><dt>Round</dt><dd>' + R.n + ' of ' + st.rounds + '</dd><dt>Flash time</dt><dd>' + durText(st.duration) + '</dd><dt>Difficulty</dt><dd>' + PRESETS[st.difficulty].name + (st.arrangement === 'varied' ? ', varied' : ', structured') + '</dd><dt>Choices</dt><dd>' + st.choices + '</dd></dl>' +
+    '<div class="tgrid"><button class="btn sm" data-act="' + (S.state === 'PAUSED' ? 'resume' : 'pause') + '" data-fid="d-pause">' + (S.state === 'PAUSED' ? 'Resume' : 'Pause') + '</button>' +
+    '<button class="btn sm ghost" data-act="repeat" data-fid="d-repeat"' + (busy || R.resolved ? ' disabled' : '') + '>Repeat round</button>' +
+    '<button class="btn sm ghost" data-act="reveal" data-fid="d-reveal"' + (canReveal ? '' : ' disabled') + '>Reveal frame</button>' +
+    '<button class="btn sm ghost" data-act="skip" data-fid="d-skip"' + (busy || S.practice ? ' disabled' : '') + '>Skip round</button>' +
+    '<button class="btn sm ghost" data-act="next" data-fid="d-next"' + (S.state === 'FEEDBACK' && R.resolved ? '' : ' disabled') + '>Next round</button>' +
+    '<button class="btn sm ghost" data-act="restart" data-fid="d-restart"' + (busy ? ' disabled' : '') + '>Restart session</button>' +
+    '<button class="btn sm ghost" data-act="resetscores" data-fid="d-reset"' + (busy || S.practice ? ' disabled' : '') + '>Reset scores</button>' +
+    '<button class="btn sm ghost" data-act="exit" data-fid="d-exit">Exit</button></div>' +
+    (busy ? '<p class="muted" style="font-size:.9rem">Some controls wait until the frame has gone. Pause first to use them.</p>' : '') +
+    tgl('hints', 'Hints', 'Turn hints on or off for this session.', st.hints).replace('data-act="toggle"', 'data-act="toggle-session-hints"') +
+    '<div><h3 style="font-size:1.1rem;margin-bottom:6px">Session so far</h3>' +
+    (stats.attempted ? '<p style="font-weight:800">First-attempt accuracy: ' + stats.accuracy + '% (' + stats.firstTry + ' of ' + stats.attempted + ')</p><p class="muted">Correct after retry: ' + stats.retryCorrect + '. Hints used: ' + stats.hints + '. Skipped: ' + stats.skipped + '.</p><table class="mini-table"><tbody>' +
+      TYPES.filter(t => stats.byType[t].n).map(t => '<tr><td>' + TYPE_NAME[t] + '</td><td>' + stats.byType[t].pct + '% (' + stats.byType[t].firstTry + '/' + stats.byType[t].n + ')</td></tr>').join('') + '</tbody></table>' : '<p class="muted">No rounds completed yet.</p>') + '</div>' +
+    '</div></aside>';
+}
+function pausedHTML(S) {
+  return '<div class="overlay" role="dialog" aria-modal="true" aria-label="Game paused"><div class="card modal"><h2>Paused</h2><p>The frame is hidden. When you resume, this round starts again from the beginning.</p><div class="row"><button class="btn gold big" data-act="resume" data-autofocus data-fid="resume">Resume</button><button class="btn ghost" data-act="restart" data-fid="p-restart">Restart</button><button class="btn ghost" data-act="exit" data-fid="p-exit">Exit</button></div></div></div>';
+}
+function modalHTML() {
+  const m = App.modal;
+  if (!m) return '';
+  return '<div class="overlay" style="z-index:50" role="dialog" aria-modal="true" aria-label="' + esc(m.title) + '"><div class="card modal"><h2>' + esc(m.title) + '</h2>' + (m.body ? '<p>' + esc(m.body) + '</p>' : '') +
+    '<div class="row">' + m.buttons.map((b, i) => '<button class="btn ' + (b.cls || 'ghost') + '" data-act="' + b.act + '" data-val="' + esc(b.val || '') + '" data-fid="m-' + i + '"' + (i === 0 ? ' data-autofocus' : '') + '>' + esc(b.label) + '</button>').join('') + '</div></div></div>';
+}
+function gameHTML() {
+  const S = App.session;
+  return '<div class="screen">' + topHTML(S) + '<main class="stage" id="stage">' + stageHTML(S) + '</main>' + bottomHTML(S) + '</div>' + (App.drawer ? drawerHTML(S) : '') + (S.state === 'PAUSED' ? pausedHTML(S) : '');
+}
+
+/* ---------- report and review ---------- */
+function computeAchievements(records, mixedDone) {
+  const got = t => records.some(r => r.type === t && r.correct);
+  return [
+    { name: 'Sharp Eyes', desc: 'Correctly identified a quantity.', on: got('quantity') },
+    { name: 'Change Tracker', desc: 'Correctly identified how a quantity changed.', on: got('change') },
+    { name: 'Missing-Part Master', desc: 'Solved a missing-part case.', on: got('missing') },
+    { name: 'Memory Expert', desc: 'Identified a frame seen earlier.', on: got('memory') },
+    { name: 'Master Detective', desc: 'Completed a mixed case file.', on: mixedDone }
+  ];
+}
+function reportHTML() {
+  const r = App.report, s = r.stats;
+  const completed = s.attempted;
+  const kp = (v, l) => '<div class="card kpi"><b>' + v + '</b><span>' + l + '</span></div>';
+  const rows = TYPES.filter(t => s.byType[t].n).map(t => { const b = s.byType[t]; return '<tr><td>' + TYPE_NAME[t] + '</td><td style="width:45%"><div class="bar" aria-hidden="true"><i style="width:' + b.pct + '%"></i></div></td><td>' + b.pct + '% <span class="muted">(' + b.firstTry + ' of ' + b.n + ')</span></td></tr>'; }).join('');
+  const slots = [];
+  for (let i = 0; i < r.rounds; i++) { const c = r.clues[i]; slots.push(c ? '<span class="slot lg found" title="' + esc(c[1]) + '" aria-label="Clue: ' + esc(c[1]) + '">' + c[0] + '</span>' : '<span class="slot lg" aria-label="Clue not found">?</span>'); }
+  const teams = r.teams && r.teams.length ? '<div class="card"><h3>Team results</h3><div class="w-actions">' + r.teams.map((t, i) => '<span class="teamchip" style="color:' + TEAM_STYLE[i].c + ';font-size:1.2rem"><b aria-hidden="true">' + TEAM_STYLE[i].sym + '</b><span style="color:var(--ink)">' + esc(t.name) + ': ' + r.teamScores[i] + ' points</span></span>').join('') + '</div><p class="muted" style="margin-top:10px">Together the teams found ' + r.clues.length + ' clue' + (r.clues.length === 1 ? '' : 's') + '.</p></div>' : '';
+  const again = s.practiceAgain.length ? '<ul class="rules">' + s.practiceAgain.map(t => '<li>' + REVIEW_TIPS[t] + '</li>').join('') + '</ul>' : '<p style="font-weight:700">' + (completed ? 'No mystery type fell below 70% first-attempt accuracy this time. Try a shorter flash or a different mystery type.' : 'No rounds were completed.') + '</p>';
+  return '<div class="screen scroll"><div class="page">' +
+    '<div class="pagehead"><h1>' + (r.finished ? 'Case closed!' : 'Case report so far') + '</h1><span class="stamp">CASE FILE ' + String(r.caseNo).padStart(2, '0') + '</span></div>' +
+    '<div class="card badge"><span class="medal" aria-hidden="true">★</span><div><h3 style="margin-bottom:4px">' + esc(PRESETS[r.difficulty] ? PRESETS[r.difficulty].name : 'Detective') + ' badge</h3><p>' + (r.finished ? 'Every clue you found is now on the case board. Nice detective work.' : 'The case was ended early. Here is what the class found.') + '</p></div></div>' +
+    '<div class="kpis">' + kp(completed + (r.skipped ? '' : ''), 'rounds completed' + (s.skipped ? ' (' + s.skipped + ' skipped)' : '')) + kp(s.accuracy == null ? '–' : s.accuracy + '%', 'first-attempt accuracy, no hints') + kp(s.retryCorrect, 'correct after a retry') + kp(s.hints, 'hints used') + kp(r.clues.length, 'clues collected') + kp(r.score, 'points') + '</div>' +
+    '<div class="card"><h3>Case board</h3><div class="slots">' + slots.join('') + '</div></div>' +
+    (rows ? '<div class="card"><h3>By mystery type</h3><table class="rep"><tbody>' + rows + '</tbody></table>' + (s.best ? '<p style="margin-top:10px;font-weight:800">Strongest this time: ' + TYPE_NAME[s.best] + '.</p>' : '') + '</div>' : '') +
+    '<div class="card"><h3>Mystery types to practise again</h3>' + again + '</div>' + teams +
+    '<div class="card"><h3>Achievements</h3><div class="ach">' + r.achievements.map(a => '<div class="' + (a.on ? 'on' : 'off') + '"><span aria-hidden="true">' + (a.on ? '🏅' : '○') + '</span><span>' + a.name + '<small>' + (a.on ? 'Earned: ' + a.desc : 'Still to find: ' + a.desc) + '</small></span></div>').join('') + '</div></div>' +
+    '<p class="muted">One short game cannot show mastery. Use these results as a starting point for conversation, not a score. Speed is never counted.</p>' +
+    '<div class="w-actions"><button class="btn gold big" data-act="replay" data-fid="replay">Replay this case</button><button class="btn ghost" data-act="go-setup" data-fid="newcase">New investigation</button><button class="btn ghost" data-act="review" data-fid="review">Teacher review</button><button class="btn ghost" data-act="go-welcome" data-fid="home">Home</button></div>' +
+    '</div></div>';
+}
+function reviewHTML() {
+  const r = App.report;
+  const rows = r.records.map((x, i) => {
+    let res;
+    if (x.skipped) res = 'Skipped: ' + esc(x.reason || 'no reason given');
+    else if (x.firstTry) res = '✓ First try';
+    else if (x.correct) res = '✓ Correct after ' + (x.hint ? 'a hint' : 'a retry') + ' (' + x.attempts + ' attempt' + (x.attempts === 1 ? '' : 's') + ')';
+    else res = '✗ Not found: ' + esc(x.answerLabel) + ' was the answer';
+    const frames = (x.frames || []).map(f => '<span style="width:150px;display:inline-block">' + frameHTML(f, 'xs') + '</span>').join('');
+    return '<tr><td>' + (i + 1) + '</td><td>' + TYPE_NAME[x.type] + '</td><td><div class="rv">' + (x.skipped ? '' : frames) + '</div></td><td>' + (x.skipped ? '' : esc(x.answerLabel)) + '</td><td>' + res + '</td></tr>';
+  }).join('');
+  return '<div class="screen scroll"><div class="page"><div class="pagehead"><button class="btn sm ghost" data-act="back-report" data-fid="back">Back to report</button><h1>Teacher review</h1><button class="btn sm ghost" data-act="copy" data-fid="copy">Copy summary</button></div>' +
+    '<p class="banner-t">Teacher view. Hide this screen before projecting it to the class.</p>' +
+    '<div class="card" style="overflow:auto"><table class="rep"><thead><tr><th>#</th><th>Mystery</th><th>Frames shown</th><th>Answer</th><th>Result</th></tr></thead><tbody>' + rows + '</tbody></table></div></div></div>';
+}
+function summaryText() {
+  const r = App.report, s = r.stats;
+  const L = ['Frame Detective, case file ' + r.caseNo, 'Rounds completed: ' + s.attempted + (s.skipped ? ' (' + s.skipped + ' skipped)' : ''), 'First-attempt accuracy (no hints): ' + (s.accuracy == null ? 'n/a' : s.accuracy + '%'), 'Correct after retry: ' + s.retryCorrect, 'Hints used: ' + s.hints, 'Clues: ' + r.clues.length, 'Points: ' + r.score];
+  TYPES.filter(t => s.byType[t].n).forEach(t => L.push(TYPE_NAME[t] + ': ' + s.byType[t].pct + '% (' + s.byType[t].firstTry + '/' + s.byType[t].n + ')'));
+  return L.join('\n');
+}
+
+/* ======================= RENDER ======================= */
+let lastKey = '', lastScreen = '', lastModal = false;
+function render() {
+  const ae = document.activeElement;
+  const fid = ae && ae.dataset ? ae.dataset.fid : null;
+  const old = document.querySelector('#app .scroll');
+  const scrollTop = old ? old.scrollTop : 0;
+  const S = App.session;
+  let html;
+  try {
+    switch (App.screen) {
+      case 'welcome': html = welcomeHTML(); break;
+      case 'howto': html = howtoHTML(); break;
+      case 'briefing': html = briefingHTML(); break;
+      case 'setup': html = setupHTML(); break;
+      case 'game': html = gameHTML(); break;
+      case 'report': html = reportHTML(); break;
+      case 'review': html = reviewHTML(); break;
+      default: html = welcomeHTML();
+    }
+    html += modalHTML();
+  } catch (err) {
+    console.error(err);
+    html = '<div class="page"><div class="card"><h2>Something went wrong</h2><p>Please go back to the start screen.</p><p class="muted">' + esc(err.message) + '</p><button class="btn gold" data-act="go-welcome">Back to start</button></div></div>';
+  }
+  document.body.classList.toggle('rm', !!App.settings.reducedMotion);
+  document.getElementById('app').innerHTML = html;
+  const key = App.screen + '|' + (S && App.screen === 'game' ? S.state + '|' + S.round.n + '|' + S.round.attempts + '|' + S.countdown : '');
+  const modalOpen = !!App.modal;
+  const changed = key !== lastKey || modalOpen !== lastModal || App.screen !== lastScreen;
+  if (App.screen === lastScreen) { const sc = document.querySelector('#app .scroll'); if (sc) sc.scrollTop = scrollTop; }
+  let target = null;
+  if (!changed && fid) target = document.querySelector('[data-fid="' + fid.replace(/"/g, '') + '"]');
+  if (!target && changed) target = document.querySelector('.overlay [data-autofocus]') || document.querySelector('[data-autofocus]');
+  if (target && !target.disabled) target.focus({ preventScroll: true });
+  lastKey = key; lastScreen = App.screen; lastModal = modalOpen;
+}
+
+/* ======================= GAME CONTROLLER ======================= */
+function nextCaseNo() { const n = (store.get('fd.case', 0) | 0) + 1; store.set('fd.case', n); return n; }
+function newSession(practice) {
+  Timers.clear();
+  const base = practice
+    ? Object.assign(defaultSettings(), { mystery: 'quantity', duration: 2000, rounds: 1, choices: 3, arrangement: 'structured', feedback: 'immediate', next: 'teacher', hints: false, retry: true, response: 'individual', adaptive: false, focus: [1, 2, 3], audio: App.settings.audio })
+    : JSON.parse(JSON.stringify(App.settings));
+  const S = {
+    practice, st: base, caseNo: practice ? 0 : nextCaseNo(), schedule: buildSchedule(base), idx: 0, records: [], score: 0,
+    teamScores: base.teams.slice(0, base.teamCount).map(() => 0), clues: [], stamps: 0, state: 'READY', seq: 0, round: null,
+    prevState: null, streakOk: 0, streakBad: 0, flashIndex: 0, countdown: null, lastQ: undefined
+  };
+  App.session = S; App.screen = 'game'; App.drawer = false; App.modal = null; App.practiceDone = false;
+  startRound();
+}
+function startRound() {
+  const S = App.session;
+  Timers.clear(); S.seq++;
+  if (S.idx >= S.st.rounds) { finishSession(true); return; }
+  let type = S.schedule[S.idx];
+  if (type === 'review') type = resolveReview(S.records.filter(r => !r.skipped), S.st);
+  const q = makeQuestion(type, S.st, { lastQ: S.lastQ });
+  S.lastQ = q.mainQ;
+  S.round = { n: S.idx + 1, q, attempts: 0, wrong: [], removed: [], hint: false, selected: null, submitted: false, resolved: false, correct: null, revealed: false, repeats: 0, team: S.st.response === 'teams' ? S.idx % S.st.teamCount : null, chosen: [], pts: 0, clue: null };
+  S.flashIndex = 0; S.countdown = null; App.drawer = App.drawer && true;
+  S.state = 'READY';
+  render();
+  if (S.st.next === 'auto') startCountdown();
+}
+function startCountdown() {
+  const S = App.session;
+  Timers.clear();
+  const t = ++S.seq;
+  S.countdown = 3; render();
+  const tick = () => {
+    if (!App.session || t !== S.seq) return;
+    S.countdown--;
+    if (S.countdown <= 0) { S.countdown = null; runSequence(); } else { render(); Timers.later(tick, 800); }
+  };
+  Timers.later(tick, 800);
+}
+function runSequence() {
+  const S = App.session;
+  Timers.clear();
+  const t = ++S.seq;
+  S.flashIndex = 0; S.countdown = null;
+  flashStep(t);
+}
+function flashStep(t) {
+  const S = App.session;
+  if (!S || t !== S.seq) return;
+  S.state = 'FLASH'; render();
+  Timers.flash(S.st.duration, () => {
+    if (!App.session || t !== S.seq) return;
+    const more = S.flashIndex < S.round.q.frames.length - 1;
+    S.state = 'RECALL'; render();   // the frame is removed from the DOM here
+    Timers.later(() => {
+      if (!App.session || t !== S.seq) return;
+      if (more) { S.flashIndex++; flashStep(t); } else showQuestion(t);
+    }, more ? 700 : 550);
+  });
+}
+function showQuestion(t) {
+  const S = App.session;
+  if (!S || t !== S.seq) return;
+  S.state = 'QUESTION';
+  S.state = 'RESPONSE';
+  render();
+  announce(S.round.q.prompt);
+}
+function optById(R, id) { return R.q.options.find(o => o.id === id); }
+function pick(id) {
+  const S = App.session;
+  if (!S || S.state !== 'RESPONSE') return;
+  const R = S.round;
+  if (R.submitted || R.resolved || R.wrong.includes(id) || R.removed.includes(id)) return;
+  if (S.st.feedback === 'delayed') { R.selected = R.selected === id ? null : id; render(); return; }
+  submit(id);
+}
+function check() {
+  const S = App.session;
+  if (!S || S.state !== 'RESPONSE' || !S.round.selected) return;
+  submit(S.round.selected);
+}
+function submit(id) {
+  const S = App.session, R = S.round;
+  if (S.state !== 'RESPONSE' || R.submitted || R.resolved) return;   // prevents duplicate submissions
+  R.submitted = true; R.attempts++; R.selected = id;
+  const o = optById(R, id);
+  R.chosen.push(R.q.type === 'memory' ? 'Frame ' + (R.q.options.indexOf(o) + 1) : o.label);
+  if (id === R.q.correctId) finalize(true);
+  else {
+    R.wrong.push(id);
+    const canRetry = S.st.retry && R.attempts < 2;
+    if (!canRetry) finalize(false);
+  }
+  S.state = 'FEEDBACK';
+  render();
+  const fc = feedbackCopy(R);
+  announce(fc.title + ' ' + fc.msg);
+  tone(R.correct ? 'ok' : 'no');
+  if (R.resolved) armAuto();
+}
+function finalize(ok) {
+  const S = App.session, R = S.round, st = S.st;
+  if (R.resolved) return;
+  R.resolved = true; R.correct = ok;
+  R.pts = ok ? pointsFor(R.attempts, R.hint) : 0;
+  if (S.practice) return;
+  S.score += R.pts;
+  if (R.team != null) S.teamScores[R.team] += R.pts;
+  S.stamps++;
+  if (ok) { R.clue = CLUES[S.clues.length % CLUES.length]; S.clues.push(R.clue); }
+  const firstTry = ok && R.attempts === 1 && !R.hint;
+  S.records.push({
+    n: R.n, type: R.q.type, subtype: R.q.subtype, team: R.team, frames: R.q.frames, answerLabel: R.q.answerLabel,
+    attempts: R.attempts, firstTry, correct: ok, hint: R.hint, revealed: R.revealed, repeats: R.repeats, points: R.pts, chosen: R.chosen.slice()
+  });
+  if (st.adaptive && st.response === 'individual') {
+    let msg = null;
+    if (firstTry) { S.streakOk++; S.streakBad = 0; if (S.streakOk >= 3) { msg = adaptUp(st); S.streakOk = 0; } }
+    else { S.streakBad++; S.streakOk = 0; if (S.streakBad >= 2) { msg = adaptDown(st); S.streakBad = 0; } }
+    if (msg) toast(msg);
+  }
+}
+function armAuto() {
+  const S = App.session;
+  if (!S || S.st.next !== 'auto' || !S.round.resolved) return;
+  const t = S.seq;
+  Timers.later(() => { if (App.session === S && t === S.seq && S.state === 'FEEDBACK') advance(); }, 5000);
+}
+function advance() {
+  const S = App.session;
+  if (!S || S.state !== 'FEEDBACK' || !S.round.resolved) return;
+  S.idx++;
+  startRound();
+}
+function retry() {
+  const S = App.session, R = S.round;
+  if (S.state !== 'FEEDBACK' || R.resolved) return;
+  R.submitted = false; R.selected = null; S.state = 'RESPONSE'; render();
+}
+function flashAgain() {
+  const S = App.session, R = S.round;
+  if (S.state !== 'FEEDBACK' || R.resolved) return;
+  R.submitted = false; R.selected = null; R.repeats++;
+  runSequence();
+}
+function showAnswer() {
+  const S = App.session, R = S.round;
+  if (S.state !== 'FEEDBACK' || R.resolved) return;
+  finalize(false); render(); armAuto();
+}
+function hint() {
+  const S = App.session, R = S.round, q = R.q;
+  if (!S.st.hints || S.state !== 'RESPONSE' || R.hint || R.resolved) return;
+  const cand = q.options.filter(o => o.id !== q.correctId && !R.wrong.includes(o.id) && !R.removed.includes(o.id));
+  const k = Math.min(cand.length - 1, q.options.length >= 5 ? 2 : 1);
+  if (k <= 0) return;
+  R.removed = R.removed.concat(shuffle(cand).slice(0, k).map(o => o.id));
+  R.hint = true;
+  if (R.selected && R.removed.includes(R.selected)) R.selected = null;
+  render();
+}
+function pause() {
+  const S = App.session;
+  if (!S || S.state === 'PAUSED') return;
+  S.prevState = S.state; Timers.clear(); S.seq++; S.countdown = null; S.state = 'PAUSED'; render();
+}
+function resume() {
+  const S = App.session;
+  if (!S || S.state !== 'PAUSED') return;
+  const p = S.prevState; S.prevState = null;
+  if (p === 'FLASH' || p === 'RECALL' || p === 'READY') {   // never resume mid-flash: the round starts again cleanly
+    S.state = 'READY'; render();
+    if (S.st.next === 'auto') startCountdown();
+  } else { S.state = p; render(); if (p === 'FEEDBACK') armAuto(); }
+}
+function pauseIfBusy() { const S = App.session; if (S && (S.state === 'FLASH' || S.state === 'RECALL')) pause(); }
+function finishSession(finished) {
+  const S = App.session;
+  Timers.clear(); S.seq++;
+  if (S.practice) { App.session = null; App.screen = 'briefing'; App.practiceDone = true; App.drawer = false; App.modal = null; render(); return; }
+  const stats = computeStats(S.records);
+  const rep = {
+    when: Date.now(), caseNo: S.caseNo, finished: !!finished, rounds: S.st.rounds, mystery: S.st.mystery, difficulty: S.st.difficulty,
+    records: S.records, stats, score: S.score, clues: S.clues,
+    teams: S.st.response === 'teams' ? S.st.teams.slice(0, S.st.teamCount) : null, teamScores: S.teamScores,
+    achievements: computeAchievements(S.records, !!finished && S.st.mystery === 'mixed')
+  };
+  store.set('fd.last', rep);
+  App.report = rep; App.screen = 'report'; App.session = null; App.drawer = false; App.modal = null;
+  render();
+}
+function exitToHome() { Timers.clear(); if (App.session) App.session.seq++; App.session = null; App.screen = 'welcome'; App.drawer = false; App.modal = null; render(); }
+
+/* ---------- navigation helpers ---------- */
+function startInvestigation() {
+  if (App.settings.showBriefing) { App.practiceDone = false; App.screen = 'briefing'; render(); }
+  else newSession(false);
+}
+function openModal(m) { pauseIfBusy(); App.modal = m; render(); }
+function closeModal() { App.modal = null; render(); }
+function applyPreset(k) { const p = PRESETS[k]; const s = App.settings; s.difficulty = k; s.duration = p.duration; s.arrangement = p.arrangement; s.choices = p.choices; s.mystery = p.mystery; }
+
+/* ======================= ACTIONS ======================= */
+const ACTIONS = {
+  'go-welcome': () => { exitToHome(); },
+  'go-setup': () => { App.screen = 'setup'; render(); },
+  'go-howto': () => { App.screen = 'howto'; render(); },
+  'go-results': () => {
+    const last = store.get('fd.last', null);
+    if (!last) { toast('No finished case yet. Play a case and its report will appear here.'); return; }
+    App.report = last; App.screen = 'report'; render();
+  },
+  start: () => startInvestigation(),
+  'start-case': () => startInvestigation(),
+  'briefing-practice': () => newSession(true),
+  'briefing-start': () => newSession(false),
+  set: el => {
+    const key = el.dataset.key; let v = el.dataset.val;
+    if (el.dataset.t === 'number') v = Number(v);
+    if (key === 'difficulty') applyPreset(v); else App.settings[key] = v;
+    if (key === 'response' && v !== 'individual') App.settings.adaptive = false;
+    saveSettings(); render();
+  },
+  toggle: el => {
+    const key = el.dataset.key;
+    if (el.hasAttribute('disabled')) return;
+    App.settings[key] = !App.settings[key];
+    saveSettings(); render();
+  },
+  'toggle-session-hints': () => { const S = App.session; if (S) { S.st.hints = !S.st.hints; render(); } },
+  focus: el => {
+    const n = Number(el.dataset.val), f = App.settings.focus;
+    App.settings.focus = f.includes(n) ? f.filter(x => x !== n) : f.concat([n]).sort();
+    saveSettings(); render();
+  },
+  mix: el => {
+    const k = el.dataset.key, d = Number(el.dataset.d), m = App.settings.mix;
+    const next = Math.max(0, Math.min(5, m[k] + d));
+    const test = Object.assign({}, m, { [k]: next });
+    if (!TYPES.some(t => test[t] > 0)) return;
+    m[k] = next; saveSettings(); render();
+  },
+  selfcheck: () => { App.selfCheck = runSelfCheck(150); render(); },
+  defaults: () => { App.settings = defaultSettings(); App.selfCheck = null; saveSettings(); render(); toast('Settings reset to the defaults.'); },
+  flash: () => { const S = App.session; if (S && S.state === 'READY') runSequence(); },
+  pick: el => pick(el.dataset.id),
+  check: () => check(), hint: () => hint(), next: () => advance(), retry: () => retry(), flashagain: () => flashAgain(), showanswer: () => showAnswer(),
+  pause: () => pause(), resume: () => resume(),
+  drawer: () => { App.drawer = !App.drawer; render(); },
+  repeat: () => {
+    const S = App.session;
+    if (!S || S.round.resolved || S.state === 'FLASH' || S.state === 'RECALL') return;
+    S.round.repeats++; S.round.submitted = false; App.drawer = false; runSequence();
+  },
+  reveal: () => { const S = App.session; if (S && !S.round.revealed) { S.round.revealed = true; render(); } },
+  skip: () => {
+    openModal({ title: 'Skip this round?', body: 'Choose a reason. It is recorded in the session review, and the round is left out of the accuracy figures.', buttons: SKIP_REASONS.map(r => ({ label: r, act: 'skipreason', val: r })).concat([{ label: 'Keep playing', act: 'closemodal' }]) });
+  },
+  skipreason: el => {
+    const S = App.session; if (!S) return;
+    S.records.push({ n: S.round.n, type: S.round.q.type, skipped: true, reason: el.dataset.val, frames: [] });
+    App.modal = null; S.idx++; startRound();
+  },
+  restart: () => openModal({ title: 'Restart the session?', body: 'Scores and clues for this case will be cleared and a new case starts.', buttons: [{ label: 'Restart', act: 'restartyes', cls: 'gold' }, { label: 'Keep playing', act: 'closemodal' }] }),
+  restartyes: () => { const p = App.session && App.session.practice; newSession(!!p); },
+  resetscores: () => openModal({ title: 'Reset scores?', body: 'Points, clues, stamps and accuracy so far will be cleared. The case carries on from this round.', buttons: [{ label: 'Reset scores', act: 'resetyes', cls: 'gold' }, { label: 'Cancel', act: 'closemodal' }] }),
+  resetyes: () => {
+    const S = App.session; if (!S) return;
+    S.score = 0; S.teamScores = S.teamScores.map(() => 0); S.records = []; S.clues = []; S.stamps = 0;
+    App.modal = null; render(); toast('Scores reset.');
+  },
+  exit: () => {
+    const S = App.session;
+    if (S && S.practice) { openModal({ title: 'Leave the practice?', buttons: [{ label: 'Back to the briefing', act: 'exitbrief', cls: 'gold' }, { label: 'Keep playing', act: 'closemodal' }] }); return; }
+    const btns = [{ label: 'Keep playing', act: 'closemodal', cls: 'gold' }];
+    if (S && S.records.length) btns.push({ label: 'See the report so far', act: 'endearly' });
+    btns.push({ label: 'Exit to the start screen', act: 'exityes' });
+    openModal({ title: 'Leave this case?', body: 'Leaving without the report discards this case.', buttons: btns });
+  },
+  exitbrief: () => { Timers.clear(); if (App.session) App.session.seq++; App.session = null; App.screen = 'briefing'; App.practiceDone = false; App.modal = null; App.drawer = false; render(); },
+  exityes: () => exitToHome(),
+  endearly: () => { App.modal = null; finishSession(false); },
+  closemodal: () => closeModal(),
+  replay: () => newSession(false),
+  review: () => { App.screen = 'review'; render(); },
+  'back-report': () => { App.screen = 'report'; render(); },
+  copy: () => {
+    const txt = summaryText();
+    try { navigator.clipboard.writeText(txt).then(() => toast('Summary copied.'), () => toast('Copying is not available here.')); }
+    catch (e) { toast('Copying is not available here.'); }
+  }
+};
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el || el.disabled) return;
+  const fn = ACTIONS[el.dataset.act];
+  if (!fn) return;
+  if (el.dataset.invert) { App.settings[el.dataset.key] = !App.settings[el.dataset.key]; saveSettings(); render(); return; }
+  fn(el);
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t && t.dataset && t.dataset.team !== undefined) {
+    App.settings.teams[Number(t.dataset.team)].name = t.value.trim() ? t.value : 'Team ' + (Number(t.dataset.team) + 1);
+    saveSettings();
+  }
+});
+document.addEventListener('keydown', e => {
+  const tag = (e.target && e.target.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const S = App.session;
+  if (App.screen !== 'game' || !S) return;
+  if (e.key === 'Escape') {
+    if (App.modal) { closeModal(); return; }
+    if (App.drawer) { App.drawer = false; render(); return; }
+    if (S.state === 'PAUSED') resume(); else pause();
+    e.preventDefault(); return;
+  }
+  if (App.modal || S.state === 'PAUSED') return;
+  if (S.state === 'RESPONSE' && /^[0-9]$/.test(e.key)) {
+    const q = S.round.q, d = Number(e.key);
+    let o = null;
+    if (q.type === 'quantity' || q.type === 'missing') o = q.options.find(x => x.value === d);
+    else o = q.options[d - 1];
+    if (o) { pick(o.id); e.preventDefault(); }
+    return;
+  }
+  if (e.key === 'Enter' || e.key === ' ') {
+    const onBody = document.activeElement === document.body || !document.activeElement;
+    if (!onBody) return;
+    if (S.state === 'READY' && !S.countdown) { runSequence(); e.preventDefault(); }
+    else if (S.state === 'RESPONSE' && S.st.feedback === 'delayed' && S.round.selected) { check(); e.preventDefault(); }
+    else if (S.state === 'FEEDBACK') { if (S.round.resolved) advance(); else retry(); e.preventDefault(); }
+  }
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) pauseIfBusy(); });
+
+render();
+</script>
+</body>
+</html>
